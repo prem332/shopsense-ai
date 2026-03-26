@@ -42,7 +42,7 @@ async def chat(request: ChatRequest):
             "error": None
         }
 
-        result = shopping_graph.invoke(initial_state)
+        result = await shopping_graph.ainvoke(initial_state)
 
         return {
             "status": "success",
