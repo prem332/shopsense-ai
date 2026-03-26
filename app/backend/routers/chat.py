@@ -1,14 +1,20 @@
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
+import json
 from app.backend.agents.graph import shopping_graph
 
 router = APIRouter()
+
 
 class ChatRequest(BaseModel):
     user_id: Optional[str] = "guest"
     session_id: Optional[str] = "default"
     query: str
+    platforms: Optional[list] = ["amazon", "flipkart", "myntra"]
+    stream: Optional[bool] = False
+
 
 @router.post("/chat")
 async def chat(request: ChatRequest):
@@ -28,7 +34,7 @@ async def chat(request: ChatRequest):
             "occasion": None,
             "budget_max": None,
             "brand": None,
-            "platforms": ["amazon", "flipkart", "myntra"],
+            "platforms": request.platforms,
             "raw_products": None,
             "ranked_products": None,
             "reflection_passed": None,
@@ -42,13 +48,54 @@ async def chat(request: ChatRequest):
             "error": None
         }
 
+        # Streaming response
+        if request.stream:
+            async def stream_response():
+                yield json.dumps({
+                    "type": "status",
+                    "message": "🔍 Searching products..."
+                }) + "\n"
+
+                result = await shopping_graph.ainvoke(initial_state)
+                products = result.get("ranked_products") or []
+
+                for product in products:
+                    yield json.dumps({
+                        "type": "product",
+                        "data": product
+                    }) + "\n"
+
+                yield json.dumps({
+                    "type": "done",
+                    "total": len(products),
+                    "intent": result.get("intent"),
+                    "response": result.get("final_response")
+                }) + "\n"
+
+            return StreamingResponse(
+                stream_response(),
+                media_type="application/x-ndjson"
+            )
+
         result = await shopping_graph.ainvoke(initial_state)
+
+        products = result.get("ranked_products") or []
 
         return {
             "status": "success",
             "intent": result.get("intent"),
             "is_valid": result.get("is_valid"),
-            "products": result.get("ranked_products", []),
+            "preferences": {
+                "category": result.get("category"),
+                "color": result.get("color"),
+                "size": result.get("size"),
+                "occasion": result.get("occasion"),
+                "budget_max": result.get("budget_max"),
+                "brand": result.get("brand"),
+            },
+            "products": products,
+            "products_count": len(products),
+            "reflection_attempts": result.get("reflection_attempts", 0),
             "alert_id": result.get("alert_id"),
             "response": result.get("final_response", "Done!")
         }

@@ -6,7 +6,13 @@ from pydantic import BaseModel
 from pathlib import Path
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from dotenv import load_dotenv
+
+from app.backend.vectorstore.pgvector_store import (
+    save_user_preference,
+    get_user_history
+)
 
 load_dotenv()
 
@@ -24,6 +30,9 @@ llm = ChatGroq(
     groq_api_key=os.getenv("GROQ_API_KEY"),
     temperature=0.1
 )
+
+embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+
 
 # ── Models ─────────────────────────────────────────────────────
 
@@ -76,10 +85,21 @@ async def handle_task(request: A2ARequest) -> A2AResponse:
 
 async def extract_preferences(payload: dict) -> dict:
     user_query = payload.get("user_query", "")
+    user_id = payload.get("user_id", "guest")
+    conversation_context = payload.get("context", "")
 
-    system_prompt = """You are a shopping assistant that extracts
+    # Build system prompt with context if available
+    context_section = ""
+    if conversation_context:
+        context_section = f"""
+Previous conversation context:
+{conversation_context}
+Use this context to better understand current preferences.
+"""
+
+    system_prompt = f"""You are a shopping assistant that extracts
     structured preferences from user queries.
-
+    {context_section}
     Extract these fields:
     - category: product type (shirts, shoes, watches, pants etc.)
     - color: preferred color
@@ -93,7 +113,7 @@ async def extract_preferences(payload: dict) -> dict:
     If a field is not mentioned, set it to null.
 
     Example:
-    {
+    {{
         "category": "shirts",
         "color": "navy blue",
         "size": "L",
@@ -101,7 +121,7 @@ async def extract_preferences(payload: dict) -> dict:
         "budget_max": 1500,
         "brand": "Allen Solly",
         "skin_tone": null
-    }"""
+    }}"""
 
     messages = [
         SystemMessage(content=system_prompt),
@@ -115,20 +135,36 @@ async def extract_preferences(payload: dict) -> dict:
         raw = raw.replace("```json", "").replace("```", "").strip()
         preferences = json.loads(raw)
         print(f"   → Extracted: {preferences}")
+
+        # Save to pgvector for future history
+        if user_id != "guest":
+            try:
+                embedding = embeddings.embed_query(user_query)
+                save_user_preference(user_id, preferences, embedding)
+            except Exception as e:
+                print(f"   → pgvector save skipped: {e}")
+
         return {"preferences": preferences, "status": "success"}
+
     except Exception as e:
         print(f"   → Extraction failed: {e}")
         return {"preferences": {}, "status": "error", "error": str(e)}
 
 
 async def fetch_history(payload: dict) -> dict:
-    # pgvector history fetch
-    user_id = payload.get("user_id")
-    return {
-        "history": [],
-        "user_id": user_id,
-        "message": "History fetch — Sprint 3"
-    }
+    """Fetch user preference history from pgvector"""
+    user_id = payload.get("user_id", "guest")
+
+    if user_id == "guest":
+        return {"history": [], "user_id": user_id}
+
+    try:
+        history = get_user_history(user_id, limit=5)
+        print(f"   → Fetched {len(history)} past preferences")
+        return {"history": history, "user_id": user_id}
+    except Exception as e:
+        print(f"   → History fetch failed: {e}")
+        return {"history": [], "user_id": user_id, "error": str(e)}
 
 
 # ── Health ─────────────────────────────────────────────────────
