@@ -1,0 +1,18 @@
+{
+  "name": "SupervisorAgent",
+  "description": "Orchestrates all agents, manages conversation memory, routes user intent",
+  "version": "1.0.0",
+  "endpoint": "http://localhost:8000",
+  "skills": [
+    {
+      "id": "classify_intent",
+      "name": "Intent Classification",
+      "description": "Classifies user query as recommendation or alert"
+    },
+    {
+      "id": "orchestrate_agents",
+      "name": "Agent Orchestration",
+      "description": "Delegates tasks to appropriate A2A agents"
+    }
+  ]
+}

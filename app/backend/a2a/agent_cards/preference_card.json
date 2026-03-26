@@ -1,0 +1,18 @@
+{
+  "name": "PreferenceAgent",
+  "description": "Extracts and manages user shopping preferences",
+  "version": "1.0.0",
+  "endpoint": "http://localhost:8002",
+  "skills": [
+    {
+      "id": "extract_preferences",
+      "name": "Preference Extraction",
+      "description": "Extracts structured preferences from natural language"
+    },
+    {
+      "id": "fetch_history",
+      "name": "Preference History",
+      "description": "Fetches user past preferences from pgvector"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "GuardrailsAgent",
+  "description": "Validates shopping queries and detects prompt injection attacks",
+  "version": "1.0.0",
+  "endpoint": "http://localhost:8001",
+  "skills": [
+    {
+      "id": "validate_input",
+      "name": "Input Validation",
+      "description": "Validates if the query is shopping related"
+    },
+    {
+      "id": "detect_injection",
+      "name": "Injection Detection",
+      "description": "Detects and blocks prompt injection attempts"
+    }
+  ]
+}

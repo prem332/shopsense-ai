@@ -1,0 +1,23 @@
+{
+  "name": "AlertAgent",
+  "description": "Registers and monitors multi-condition price, stock and discount alerts",
+  "version": "1.0.0",
+  "endpoint": "http://localhost:8004",
+  "skills": [
+    {
+      "id": "register_alert",
+      "name": "Alert Registration",
+      "description": "Saves user alert preferences to Supabase"
+    },
+    {
+      "id": "check_conditions",
+      "name": "Condition Checking",
+      "description": "Evaluates all alert conditions against current data"
+    },
+    {
+      "id": "fire_notification",
+      "name": "Notification",
+      "description": "Fires notification when all conditions are met"
+    }
+  ]
+}

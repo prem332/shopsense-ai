@@ -1,0 +1,23 @@
+{
+  "name": "SearchRankAgent",
+  "description": "Searches and ranks products across Amazon, Flipkart, and Myntra",
+  "version": "1.0.0",
+  "endpoint": "http://localhost:8003",
+  "skills": [
+    {
+      "id": "search_products",
+      "name": "Product Search",
+      "description": "Parallel product search across 3 platforms via SerpAPI"
+    },
+    {
+      "id": "rank_products",
+      "name": "Product Ranking",
+      "description": "Ranks products using Pinecone vector similarity"
+    },
+    {
+      "id": "reflect_results",
+      "name": "Self Reflection",
+      "description": "Evaluates result quality and re-searches if needed"
+    }
+  ]
+}
