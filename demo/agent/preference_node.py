@@ -1,15 +1,15 @@
 import os
 import json
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
 from demo.agent.state import ShopSenseState
 from dotenv import load_dotenv
 
 load_dotenv()
 
-llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash-latest",
-    google_api_key=os.getenv("GEMINI_API_KEY"),
+llm = ChatGroq(
+    model="llama-3.1-8b-instant",
+    groq_api_key=os.getenv("GROQ_API_KEY"),
     temperature=0.1
 )
 
@@ -20,7 +20,7 @@ def preference_node(state: ShopSenseState) -> ShopSenseState:
     system_prompt = """You are a shopping assistant that extracts
     structured preferences from user queries.
 
-    Extract these fields from the user query:
+    Extract these fields:
     - category: product type (shirts, shoes, watches, pants etc.)
     - color: preferred color
     - size: clothing or shoe size
@@ -52,7 +52,7 @@ def preference_node(state: ShopSenseState) -> ShopSenseState:
         raw = response.content.strip()
         raw = raw.replace("```json", "").replace("```", "").strip()
         preferences = json.loads(raw)
-        print(f"✅ Preferences extracted: {preferences}")
+        print(f"✅ Preferences: {preferences}")
 
         return {
             **state,
@@ -65,7 +65,7 @@ def preference_node(state: ShopSenseState) -> ShopSenseState:
         }
 
     except Exception as e:
-        print(f"❌ Preference extraction failed: {e}")
+        print(f"❌ Extraction failed: {e}")
         return {
             **state,
             "error": f"Could not extract preferences: {str(e)}"

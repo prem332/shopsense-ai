@@ -3,21 +3,19 @@ import hashlib
 from demo.agent.state import ShopSenseState
 from demo.tools.amazon_tool import search_amazon
 from demo.vectorstore.pinecone_store import get_pinecone_index
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from dotenv import load_dotenv
 
 load_dotenv()
 
-embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/embedding-001",
-    google_api_key=os.getenv("GEMINI_API_KEY")
+embeddings = HuggingFaceEmbeddings(
+    model_name="all-MiniLM-L6-v2"
 )
 
 
 def search_node(state: ShopSenseState) -> ShopSenseState:
     print("🔍 Search Node: Searching products...")
 
-    # Build search query from preferences
     query_parts = []
     if state.get("brand"):
         query_parts.append(state["brand"])
@@ -36,7 +34,6 @@ def search_node(state: ShopSenseState) -> ShopSenseState:
 
     print(f"📝 Query: {search_query}")
 
-    # Search Amazon
     products = search_amazon(
         query=search_query,
         budget_max=state.get("budget_max")
@@ -50,7 +47,6 @@ def search_node(state: ShopSenseState) -> ShopSenseState:
             "error": "No products found"
         }
 
-    # Store in Pinecone
     try:
         index = get_pinecone_index()
         vectors = []
