@@ -10,7 +10,9 @@ load_dotenv()
 async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
     """
     Supervisor Agent — A2A CLIENT
-    Sprint 3: Multi-platform search + memory + reflection
+    Sprint 2: Basic A2A orchestration
+    Sprint 3: Multi-platform + memory + reflection
+    Sprint 4: Full alert registration with conditions
     """
     print("\n🎯  Supervisor: Starting orchestration...")
 
@@ -22,7 +24,7 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
     # Get conversation context from memory
     context = conversation_memory.get_context_summary(session_id)
 
-    # ── Step 1: Guardrails ─────────────────────────────────────
+
     print("📡  A2A → GuardrailsAgent: validate_input")
     guardrails_result = await supervisor_client.delegate_task(
         agent_name="GuardrailsAgent",
@@ -45,7 +47,7 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
             "final_response": response
         }
 
-    # ── Recommendation Flow ────────────────────────────────────
+
     if intent == "recommendation":
 
         # Step 2: Extract preferences
@@ -61,7 +63,7 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
         )
         preferences = pref_result.get("preferences", {})
 
-        # Step 3: Fetch preference history
+        # Step 3: Fetch preference history from pgvector
         print("📡  A2A → PreferenceAgent: fetch_history")
         history_result = await supervisor_client.delegate_task(
             agent_name="PreferenceAgent",
@@ -72,7 +74,7 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
         if history:
             print(f"   → Found {len(history)} past preferences")
 
-        # Step 4: Search products (with self-reflection loop)
+        # Step 4: Search products with self-reflection loop
         platforms = state.get(
             "platforms",
             ["amazon", "flipkart", "myntra"]
@@ -80,17 +82,20 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
         all_products = []
         reflection_attempts = 0
         max_attempts = 2
+        current_query = user_query
 
         while reflection_attempts < max_attempts:
-            print(f"📡  A2A → SearchRankAgent: search_products "
-                  f"(attempt {reflection_attempts + 1})")
+            print(
+                f"📡  A2A → SearchRankAgent: search_products "
+                f"(attempt {reflection_attempts + 1})"
+            )
 
             search_result = await supervisor_client.delegate_task(
                 agent_name="SearchRankAgent",
                 skill_id="search_products",
                 payload={
                     "preferences": preferences,
-                    "user_query": user_query,
+                    "user_query": current_query,
                     "platforms": platforms
                 }
             )
@@ -117,7 +122,7 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
             refined_query = reflection_result.get("refined_query")
             if refined_query:
                 print(f"   → 🔄 Refining search: {refined_query}")
-                user_query = refined_query
+                current_query = refined_query
 
             reflection_attempts += 1
 
@@ -135,7 +140,10 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
         ranked = rank_result.get("ranked_products", [])
         print(f"✅  Supervisor: Got {len(ranked)} ranked products")
 
-        response = f"Found {len(ranked)} products across {len(platforms)} platforms!"
+        response = (
+            f"Found {len(ranked)} products "
+            f"across {len(platforms)} platforms!"
+        )
 
         # Save to conversation memory
         conversation_memory.add_turn(
@@ -163,7 +171,7 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
             "final_response": response
         }
 
-    # ── Alert Flow ─────────────────────────────────────────────
+
     elif intent == "alert":
         print("📡  A2A → AlertAgent: register_alert")
         alert_result = await supervisor_client.delegate_task(
@@ -175,17 +183,61 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
             }
         )
 
-        response = "✅ Alert registered! We'll notify you when conditions are met."
+        alert_id = alert_result.get("alert_id")
+        conditions = alert_result.get("conditions", {})
 
+        # Build human readable conditions summary
+        condition_parts = []
+        if conditions.get("brand"):
+            condition_parts.append(f"Brand: {conditions['brand']}")
+        if conditions.get("target_price"):
+            condition_parts.append(
+                f"Price ≤ ₹{conditions['target_price']}"
+            )
+        if conditions.get("discount_pct"):
+            condition_parts.append(
+                f"Discount ≥ {conditions['discount_pct']}%"
+            )
+        if conditions.get("in_stock"):
+            condition_parts.append("Back in stock")
+        if conditions.get("color"):
+            condition_parts.append(f"Color: {conditions['color']}")
+        if conditions.get("size"):
+            condition_parts.append(f"Size: {conditions['size']}")
+
+        platforms = conditions.get("platforms", [])
+        platform_text = " + ".join(
+            [p.title() for p in platforms]
+        ) if platforms else "All platforms"
+
+        conditions_text = (
+            " | ".join(condition_parts)
+            if condition_parts
+            else "Custom conditions"
+        )
+
+        response = (
+            f"✅ Alert registered successfully!\n"
+            f"🔔 Monitoring: {conditions_text}\n"
+            f"🏪 Platforms: {platform_text}\n"
+            f"📋 Alert ID: {alert_id}\n"
+            f"⏰ Checking every 6 hours"
+        )
+
+        # Save to conversation memory
         conversation_memory.add_turn(
-            session_id, user_query, response, intent
+            session_id=session_id,
+            user_query=user_query,
+            response=response,
+            intent=intent
         )
 
         return {
             **state,
             "is_valid": True,
-            "alert_id": alert_result.get("alert_id"),
+            "alert_id": alert_id,
             "final_response": response
         }
+
 
     return {**state, "final_response": "Request processed!"}
