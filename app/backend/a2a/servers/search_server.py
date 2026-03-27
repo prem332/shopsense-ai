@@ -24,8 +24,6 @@ app.add_middleware(
 )
 
 
-# ── Models ─────────────────────────────────────────────────────
-
 class A2ARequest(BaseModel):
     jsonrpc: str = "2.0"
     id: str
@@ -39,16 +37,13 @@ class A2AResponse(BaseModel):
     result: dict
 
 
-# ── Agent Card ─────────────────────────────────────────────────
-
 @app.get("/.well-known/agent.json")
 async def get_agent_card():
-    card_path = Path(__file__).parent.parent / "agent_cards/search_card.json"
+    card_path = Path(__file__).parent.parent / \
+        "agent_cards/search_card.json"
     with open(card_path) as f:
         return json.load(f)
 
-
-# ── A2A Endpoint ───────────────────────────────────────────────
 
 @app.post("/a2a")
 async def handle_task(request: A2ARequest) -> A2AResponse:
@@ -73,17 +68,25 @@ async def handle_task(request: A2ARequest) -> A2AResponse:
     )
 
 
-# ── Skill Implementations ──────────────────────────────────────
-
 async def search_products(payload: dict) -> dict:
     preferences = payload.get("preferences", {})
     user_query = payload.get("user_query", "")
     platforms = payload.get("platforms", ["amazon", "flipkart", "myntra"])
 
+    # ✅ Extract all filter params
     budget_min = preferences.get("budget_min", 0) or 0
     budget_max = preferences.get("budget_max", 0) or 0
+    gender = preferences.get("gender", "") or ""
 
+    # ✅ Build clean search query WITH gender
     query_parts = []
+
+    # Add gender prefix to search
+    if gender == "female":
+        query_parts.append("women's")
+    elif gender == "male":
+        query_parts.append("men's")
+
     if preferences.get("brand"):
         query_parts.append(preferences["brand"])
     if preferences.get("color"):
@@ -95,23 +98,14 @@ async def search_products(payload: dict) -> dict:
     if preferences.get("size"):
         query_parts.append(f"size {preferences['size']}")
 
-    if query_parts:
-        query = " ".join(query_parts)
-    else:
-        # Clean user_query by removing price mentions
-        import re
-        query = re.sub(
-            r'between\s*₹[\d,]+\s*and\s*₹[\d,]+', '', user_query
-        )
-        query = re.sub(r'under\s*₹[\d,]+', '', query)
-        query = re.sub(r'₹[\d,]+', '', query)
-        query = query.strip()
+    query = " ".join(query_parts) if query_parts else user_query
 
     print(f"   → Query: {query}")
+    print(f"   → Gender: {gender}")
     print(f"   → Platforms: {platforms}")
     print(f"   → Budget: ₹{budget_min} — ₹{budget_max}")
 
-    # ✅ Parallel search across all platforms
+    # ✅ Parallel search
     tasks = []
 
     if "amazon" in platforms:
@@ -128,6 +122,7 @@ async def search_products(payload: dict) -> dict:
             asyncio.to_thread(
                 search_flipkart,
                 query,
+                budget_min if budget_min > 0 else None,
                 budget_max if budget_max > 0 else None
             )
         )
@@ -136,14 +131,13 @@ async def search_products(payload: dict) -> dict:
             asyncio.to_thread(
                 search_myntra,
                 query,
+                budget_min if budget_min > 0 else None,
                 budget_max if budget_max > 0 else None
             )
         )
 
-    # Run all searches in parallel
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    # Combine results
     all_products = []
     for result in results:
         if isinstance(result, list):
@@ -151,7 +145,6 @@ async def search_products(payload: dict) -> dict:
 
     print(f"   → Total products found: {len(all_products)}")
 
-    # Store in Pinecone
     if all_products:
         await asyncio.to_thread(store_products, all_products)
 
@@ -169,13 +162,12 @@ async def rank_products(payload: dict) -> dict:
     if not products:
         return {"ranked_products": [], "total": 0}
 
-    # Score each product
     scored = []
     for p in products:
         score = 0
         title_lower = p.get("title", "").lower()
 
-        # Brand match — highest priority
+        # Brand match
         if preferences.get("brand") and \
            preferences["brand"].lower() in title_lower:
             score += 5
@@ -195,6 +187,19 @@ async def rank_products(payload: dict) -> dict:
            preferences["occasion"].lower() in title_lower:
             score += 2
 
+        # Gender match
+        gender = preferences.get("gender", "")
+        if gender == "female":
+            if any(w in title_lower for w in [
+                "women", "woman", "female", "ladies", "girl"
+            ]):
+                score += 3
+        elif gender == "male":
+            if any(w in title_lower for w in [
+                "men", "man", "male", "gents", "boy"
+            ]):
+                score += 3
+
         # Rating bonus
         try:
             rating = float(
@@ -207,22 +212,20 @@ async def rank_products(payload: dict) -> dict:
         except Exception:
             pass
 
+        # Budget range bonus
         price_num = p.get("price_num")
         budget_min = preferences.get("budget_min", 0) or 0
         budget_max = preferences.get("budget_max", 0) or 0
 
         if price_num and budget_max > 0:
-            # Within range gets bonus
             if budget_min <= price_num <= budget_max:
                 score += 2
-            # Cheap within max is good
             elif price_num <= budget_max * 0.7:
                 score += 1
 
         p["score"] = score
         scored.append(p)
 
-    # Sort by score descending
     ranked = sorted(scored, key=lambda x: x["score"], reverse=True)
     print(f"   → Ranked {len(ranked)} products")
 
@@ -233,10 +236,6 @@ async def rank_products(payload: dict) -> dict:
 
 
 async def reflect_results(payload: dict) -> dict:
-    """
-    Self-reflection loop:
-    Evaluates if results are good enough.
-    """
     products = payload.get("products", [])
     preferences = payload.get("preferences", {})
     attempts = payload.get("attempts", 0)
@@ -252,11 +251,11 @@ async def reflect_results(payload: dict) -> dict:
     if len(products) < 3 and attempts < max_attempts:
         issues.append("Too few results")
 
-    # Check brand match
     if products and preferences.get("brand"):
         brand_matches = [
             p for p in products
-            if preferences["brand"].lower() in p.get("title", "").lower()
+            if preferences["brand"].lower() in
+            p.get("title", "").lower()
         ]
         if not brand_matches:
             issues.append(
@@ -265,10 +264,14 @@ async def reflect_results(payload: dict) -> dict:
 
     passed = len(issues) == 0 or attempts >= max_attempts
 
-    # Build refined query if needed
     refined_query = None
     if not passed and issues:
         query_parts = []
+        gender = preferences.get("gender", "")
+        if gender == "female":
+            query_parts.append("women's")
+        elif gender == "male":
+            query_parts.append("men's")
         if preferences.get("color"):
             query_parts.append(preferences["color"])
         if preferences.get("category"):
@@ -289,8 +292,6 @@ async def reflect_results(payload: dict) -> dict:
         )
     }
 
-
-# ── Health ─────────────────────────────────────────────────────
 
 @app.get("/health")
 async def health():

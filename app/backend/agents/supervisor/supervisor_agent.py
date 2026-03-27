@@ -22,13 +22,11 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
     user_id = state.get("user_id", "guest")
     intent = state.get("intent", "recommendation")
 
-    # Get conversation context from memory
     context = conversation_memory.get_context_summary(session_id)
 
     # ══════════════════════════════════════════════════════════
     # STEP 1: Guardrails
     # ══════════════════════════════════════════════════════════
-
     print("📡  A2A → GuardrailsAgent: validate_input")
     guardrails_result = await supervisor_client.delegate_task(
         agent_name="GuardrailsAgent",
@@ -54,7 +52,6 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
     # ══════════════════════════════════════════════════════════
     # RECOMMENDATION FLOW
     # ══════════════════════════════════════════════════════════
-
     if intent == "recommendation":
 
         # Step 2: Extract preferences
@@ -70,15 +67,31 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
         )
         preferences = pref_result.get("preferences", {})
 
-        # ✅ Inject budget_min and budget_max from state into preferences
+        # ✅ Inject budget_min, budget_max, gender from state
         budget_min = state.get("budget_min") or 0
         budget_max = state.get("budget_max") or 0
         preferences["budget_min"] = budget_min
         preferences["budget_max"] = budget_max
+
+        # ✅ Inject gender
+        gender = state.get("gender", "") or ""
+        if not gender:
+            query_lower = user_query.lower()
+            if any(w in query_lower for w in [
+                "female", "women", "girl", "ladies", "woman"
+            ]):
+                gender = "female"
+            elif any(w in query_lower for w in [
+                "male", "men", "boy", "gents", "man"
+            ]):
+                gender = "male"
+
+        preferences["gender"] = gender
+
         print(
-            f"   → Budget injected: "
-            f"₹{budget_min} — ₹{budget_max}"
+            f"   → Budget injected: ₹{budget_min} — ₹{budget_max}"
         )
+        print(f"   → Gender injected: {gender}")
 
         # Step 3: Fetch preference history
         print("📡  A2A → PreferenceAgent: fetch_history")
@@ -179,6 +192,7 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
             "occasion": preferences.get("occasion"),
             "budget_max": preferences.get("budget_max"),
             "brand": preferences.get("brand"),
+            "gender": gender,
             "raw_products": all_products,
             "ranked_products": ranked,
             "reflection_passed": True,
@@ -189,7 +203,6 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
     # ══════════════════════════════════════════════════════════
     # ALERT FLOW
     # ══════════════════════════════════════════════════════════
-
     elif intent == "alert":
         print("📡  A2A → AlertAgent: register_alert")
         alert_result = await supervisor_client.delegate_task(
@@ -254,9 +267,5 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
             "alert_id": alert_id,
             "final_response": response
         }
-
-    # ══════════════════════════════════════════════════════════
-    # FALLBACK
-    # ══════════════════════════════════════════════════════════
 
     return {**state, "final_response": "Request processed!"}

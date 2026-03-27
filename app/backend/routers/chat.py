@@ -23,8 +23,6 @@ class ChatRequest(BaseModel):
 async def chat(request: ChatRequest):
     print(f"\n💬  Chat: {request.query}")
     try:
-        # ✅ ONLY add gender to query
-        # NEVER add budget — it breaks Guardrails!
         enriched_query = request.query
         if (
             request.gender and
@@ -33,7 +31,10 @@ async def chat(request: ChatRequest):
             enriched_query = f"{request.gender}'s {enriched_query}"
 
         print(f"   → Query: {enriched_query}")
-        print(f"   → Budget: ₹{request.budget_min} — ₹{request.budget_max}")
+        print(
+            f"   → Budget: ₹{request.budget_min} — ₹{request.budget_max}"
+        )
+        print(f"   → Gender: {request.gender}")
 
         initial_state = {
             "user_id": request.user_id,
@@ -49,6 +50,7 @@ async def chat(request: ChatRequest):
             "occasion": None,
             "budget_min": request.budget_min,
             "budget_max": request.budget_max,
+            "gender": request.gender,
             "brand": None,
             "platforms": request.platforms,
             "raw_products": None,
