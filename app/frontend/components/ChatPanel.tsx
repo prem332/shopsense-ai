@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Send, Bot, User, Loader2 } from "lucide-react";
 import { sendChatMessage } from "@/lib/api";
 import { ChatResponse } from "@/types";
-import { Filters as FilterType } from "./FilterPanel";
+import { Filters } from "./FilterPanel";
 
 interface Message {
   id: string;
@@ -14,7 +14,7 @@ interface Message {
 }
 
 interface ChatPanelProps {
-  filters: FilterType;
+  filters: Filters;
   onProductsReceived: (response: ChatResponse) => void;
   sessionId: string;
   userId: string;
@@ -30,7 +30,8 @@ export default function ChatPanel({
     {
       id: "welcome",
       role: "assistant",
-      content: "👋 Hi! I'm ShopSense AI. Tell me what you're looking for, or use the filters on the left. I'll find the best products across Amazon, Flipkart, and Myntra!",
+      content:
+        "👋 Hi! I'm ShopSense AI. Tell me what you're looking for, or use the filters on the left. I'll find the best products across Amazon, Flipkart, and Myntra!",
       timestamp: new Date(),
     },
   ]);
@@ -44,13 +45,42 @@ export default function ChatPanel({
 
   const buildQueryFromFilters = (): string => {
     const parts: string[] = [];
+
+    if (filters.gender) parts.push(`${filters.gender}'s`);
     if (filters.brand) parts.push(filters.brand);
     if (filters.color) parts.push(filters.color);
     if (filters.category) parts.push(filters.category);
     if (filters.occasion) parts.push(`for ${filters.occasion}`);
     if (filters.size) parts.push(`size ${filters.size}`);
-    if (filters.budget) parts.push(`under ₹${filters.budget}`);
+
     return parts.join(" ");
+  };
+
+  const buildAssistantMessage = (response: ChatResponse): string => {
+    // Alert intent
+    if (response.intent === "alert") {
+      return response.response;
+    }
+
+    // No products found
+    if (response.products_count === 0) {
+      const budgetInfo =
+        filters.budget_min > 0
+          ? `₹${filters.budget_min.toLocaleString()} — ₹${filters.budget_max.toLocaleString()}`
+          : `under ₹${filters.budget_max.toLocaleString()}`;
+
+      return (
+        `❌ No products found in your budget range (${budgetInfo}).\n\n` +
+        `💡 Try:\n` +
+        `• Lower the minimum price\n` +
+        `• Increase the maximum price\n` +
+        `• Use broader keywords\n` +
+        `• Remove some filters`
+      );
+    }
+
+    // Products found
+    return `${response.response}\n\nScroll down to see the products! 🛍️`;
   };
 
   const sendMessage = async (queryOverride?: string) => {
@@ -72,19 +102,19 @@ export default function ChatPanel({
       const response = await sendChatMessage(query, {
         userId,
         sessionId,
-        platforms: filters.platforms.length > 0
-          ? filters.platforms
-          : ["amazon", "flipkart", "myntra"],
+        platforms:
+          filters.platforms.length > 0
+            ? filters.platforms
+            : ["amazon", "flipkart", "myntra"],
+        budget_min: filters.budget_min,
+        budget_max: filters.budget_max,
+        gender: filters.gender,
       });
-
-      const assistantContent = response.intent === "alert"
-        ? response.response
-        : `${response.response}\n\nScroll down to see the products! 🛍️`;
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: assistantContent,
+        content: buildAssistantMessage(response),
         timestamp: new Date(),
       };
 
@@ -95,7 +125,8 @@ export default function ChatPanel({
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "❌ Something went wrong. Please try again.",
+        content:
+          "❌ Something went wrong. Please check if the backend is running and try again.",
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -106,7 +137,18 @@ export default function ChatPanel({
 
   const handleFilterSearch = () => {
     const query = buildQueryFromFilters();
-    if (query) sendMessage(query);
+    if (query.trim()) {
+      sendMessage(query);
+    } else {
+      const warningMessage: Message = {
+        id: Date.now().toString(),
+        role: "assistant",
+        content:
+          "⚠️ Please select at least one filter (category, color, gender etc.) before searching with filters.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, warningMessage]);
+    }
   };
 
   return (
@@ -121,6 +163,28 @@ export default function ChatPanel({
           <h2 className="font-semibold text-gray-800">ShopSense AI</h2>
           <p className="text-xs text-green-500">● Online</p>
         </div>
+
+        {/* Active filters indicator */}
+        {(filters.budget_min > 0 || filters.gender || filters.category) && (
+          <div className="ml-auto flex flex-wrap gap-1">
+            {filters.gender && (
+              <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">
+                {filters.gender}
+              </span>
+            )}
+            {filters.category && (
+              <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">
+                {filters.category}
+              </span>
+            )}
+            {filters.budget_min > 0 && (
+              <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">
+                ₹{filters.budget_min.toLocaleString()}–
+                ₹{filters.budget_max.toLocaleString()}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Messages */}
@@ -133,36 +197,44 @@ export default function ChatPanel({
             }`}
           >
             {/* Avatar */}
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
-              message.role === "user"
-                ? "bg-indigo-100"
-                : "bg-indigo-600"
-            }`}>
-              {message.role === "user"
-                ? <User size={14} className="text-indigo-600" />
-                : <Bot size={14} className="text-white" />
-              }
+            <div
+              className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
+                message.role === "user"
+                  ? "bg-indigo-100"
+                  : "bg-indigo-600"
+              }`}
+            >
+              {message.role === "user" ? (
+                <User size={14} className="text-indigo-600" />
+              ) : (
+                <Bot size={14} className="text-white" />
+              )}
             </div>
 
             {/* Bubble */}
-            <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm whitespace-pre-wrap ${
-              message.role === "user"
-                ? "bg-indigo-600 text-white rounded-tr-none"
-                : "bg-gray-100 text-gray-800 rounded-tl-none"
-            }`}>
+            <div
+              className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm whitespace-pre-wrap ${
+                message.role === "user"
+                  ? "bg-indigo-600 text-white rounded-tr-none"
+                  : "bg-gray-100 text-gray-800 rounded-tl-none"
+              }`}
+            >
               {message.content}
             </div>
           </div>
         ))}
 
-        {/* Loading */}
+        {/* Loading indicator */}
         {isLoading && (
           <div className="flex gap-3">
             <div className="w-7 h-7 bg-indigo-600 rounded-full flex items-center justify-center">
               <Bot size={14} className="text-white" />
             </div>
-            <div className="bg-gray-100 px-4 py-2.5 rounded-2xl rounded-tl-none">
-              <Loader2 size={16} className="animate-spin text-indigo-600" />
+            <div className="bg-gray-100 px-4 py-3 rounded-2xl rounded-tl-none flex items-center gap-2">
+              <Loader2 size={14} className="animate-spin text-indigo-600" />
+              <span className="text-xs text-gray-500">
+                Searching across Amazon, Flipkart, Myntra...
+              </span>
             </div>
           </div>
         )}
@@ -191,11 +263,11 @@ export default function ChatPanel({
           </button>
         </div>
 
-        {/* Filter Search Button */}
+        {/* Filter search button */}
         <button
           onClick={handleFilterSearch}
           disabled={isLoading}
-          className="mt-2 w-full text-xs text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 py-1.5 rounded-lg transition-colors"
+          className="mt-2 w-full text-xs text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 py-1.5 rounded-lg transition-colors disabled:opacity-50"
         >
           🔍 Search with filters above
         </button>

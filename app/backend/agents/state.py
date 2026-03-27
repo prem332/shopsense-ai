@@ -14,26 +14,32 @@ class ShopSenseState(TypedDict):
     is_valid: Optional[bool]
     rejection_reason: Optional[str]
 
+    # Preferences
     category: Optional[str]
     color: Optional[str]
     size: Optional[str]
     skin_tone: Optional[str]
     occasion: Optional[str]
+    budget_min: Optional[float]
     budget_max: Optional[float]
     brand: Optional[str]
+    gender: Optional[str]
     platforms: Optional[List[str]]
 
+    # Search results
     raw_products: Optional[List[dict]]
     ranked_products: Optional[List[dict]]
     reflection_passed: Optional[bool]
     reflection_attempts: Optional[int]
 
+    # Alert fields
     alert_id: Optional[str]
     target_price: Optional[float]
     discount_pct: Optional[int]
     in_stock_alert: Optional[bool]
     new_arrival_alert: Optional[bool]
 
+    # Final output
     final_response: Optional[str]
     error: Optional[str]
 

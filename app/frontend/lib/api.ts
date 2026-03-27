@@ -1,7 +1,8 @@
 import axios from "axios";
 import { ChatResponse, AlertsResponse } from "@/types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -16,6 +17,9 @@ export async function sendChatMessage(
     userId?: string;
     sessionId?: string;
     platforms?: string[];
+    budget_min?: number;
+    budget_max?: number;
+    gender?: string;
   } = {}
 ): Promise<ChatResponse> {
   const response = await api.post("/api/chat", {
@@ -23,6 +27,9 @@ export async function sendChatMessage(
     user_id: options.userId || "guest",
     session_id: options.sessionId || "default",
     platforms: options.platforms || ["amazon", "flipkart", "myntra"],
+    budget_min: options.budget_min || 0,
+    budget_max: options.budget_max || 0,
+    gender: options.gender || "",
   });
   return response.data;
 }

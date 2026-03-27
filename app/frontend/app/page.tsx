@@ -13,9 +13,11 @@ const DEFAULT_FILTERS: Filters = {
   color: "",
   size: "",
   occasion: "",
-  budget: 2000,
+  budget_min: 0,
+  budget_max: 2000,
   brand: "",
   platforms: ["amazon", "flipkart", "myntra"],
+  gender: "",
 };
 
 const USER_ID = "user-123";
@@ -27,9 +29,8 @@ export default function Home() {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [products, setProducts] = useState<Product[]>([]);
   const [lastResponse, setLastResponse] = useState<ChatResponse | null>(null);
-
-  
   const [sessionId, setSessionId] = useState<string>("default");
+
   useEffect(() => {
     setSessionId(`session-${Date.now()}`);
   }, []);
@@ -95,11 +96,11 @@ export default function Home() {
 
       <main className="max-w-7xl mx-auto px-4 py-6">
 
-        {/* ── SHOP TAB ─────────────────────────────────── */}
+        {/* ── SHOP TAB ───────────────────────────────────── */}
         {activeTab === "shop" && (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
 
-            {/* Left: Filters */}
+            {/* Filters */}
             <div className="lg:col-span-1">
               <FilterPanel
                 filters={filters}
@@ -108,10 +109,9 @@ export default function Home() {
               />
             </div>
 
-            {/* Right: Chat + Products */}
+            {/* Chat + Products */}
             <div className="lg:col-span-3 space-y-6">
 
-              {/* Chat Panel */}
               <ChatPanel
                 filters={filters}
                 onProductsReceived={handleProductsReceived}
@@ -120,37 +120,37 @@ export default function Home() {
               />
 
               {/* Results Summary */}
-              {lastResponse && lastResponse.intent === "recommendation" && (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="font-semibold text-gray-800">
-                      {products.length > 0
-                        ? `${products.length} Products Found`
-                        : "No Products Found"
-                      }
-                    </h2>
-                    {lastResponse.preferences && (
-                      <div className="flex flex-wrap gap-1.5 mt-1">
-                        {Object.entries(lastResponse.preferences)
-                          .filter(([_, v]) => v !== null)
-                          .map(([k, v]) => (
-                            <span
-                              key={k}
-                              className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full"
-                            >
-                              {k}: {String(v)}
-                            </span>
-                          ))}
-                      </div>
+              {lastResponse &&
+                lastResponse.intent === "recommendation" && (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="font-semibold text-gray-800">
+                        {products.length > 0
+                          ? `${products.length} Products Found`
+                          : "No Products Found"}
+                      </h2>
+                      {lastResponse.preferences && (
+                        <div className="flex flex-wrap gap-1.5 mt-1">
+                          {Object.entries(lastResponse.preferences)
+                            .filter(([_, v]) => v !== null)
+                            .map(([k, v]) => (
+                              <span
+                                key={k}
+                                className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full"
+                              >
+                                {k}: {String(v)}
+                              </span>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                    {products.length > 0 && (
+                      <p className="text-xs text-gray-400">
+                        Attempts: {lastResponse.reflection_attempts}
+                      </p>
                     )}
                   </div>
-                  {products.length > 0 && (
-                    <p className="text-xs text-gray-400">
-                      Attempts: {lastResponse.reflection_attempts}
-                    </p>
-                  )}
-                </div>
-              )}
+                )}
 
               {/* Product Grid */}
               {products.length > 0 && (
@@ -169,19 +169,19 @@ export default function Home() {
               {lastResponse &&
                 lastResponse.intent === "recommendation" &&
                 products.length === 0 && (
-                <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
-                  <ShoppingBag
-                    size={48}
-                    className="mx-auto text-gray-300 mb-4"
-                  />
-                  <p className="text-gray-500 font-medium">
-                    No products found
-                  </p>
-                  <p className="text-gray-400 text-sm mt-1">
-                    Try different keywords or adjust your filters
-                  </p>
-                </div>
-              )}
+                  <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
+                    <ShoppingBag
+                      size={48}
+                      className="mx-auto text-gray-300 mb-4"
+                    />
+                    <p className="text-gray-500 font-medium">
+                      No products found
+                    </p>
+                    <p className="text-gray-400 text-sm mt-1">
+                      Try different keywords or adjust filters
+                    </p>
+                  </div>
+                )}
             </div>
           </div>
         )}

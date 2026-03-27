@@ -1,5 +1,6 @@
 import os
 import asyncio
+import json
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -44,7 +45,6 @@ class A2AResponse(BaseModel):
 async def get_agent_card():
     card_path = Path(__file__).parent.parent / "agent_cards/search_card.json"
     with open(card_path) as f:
-        import json
         return json.load(f)
 
 
@@ -79,7 +79,9 @@ async def search_products(payload: dict) -> dict:
     preferences = payload.get("preferences", {})
     user_query = payload.get("user_query", "")
     platforms = payload.get("platforms", ["amazon", "flipkart", "myntra"])
-    budget_max = preferences.get("budget_max")
+
+    budget_min = preferences.get("budget_min", 0) or 0
+    budget_max = preferences.get("budget_max", 0) or 0
 
     query_parts = []
     if preferences.get("brand"):
@@ -93,29 +95,55 @@ async def search_products(payload: dict) -> dict:
     if preferences.get("size"):
         query_parts.append(f"size {preferences['size']}")
 
-    query = " ".join(query_parts) if query_parts else user_query
+    if query_parts:
+        query = " ".join(query_parts)
+    else:
+        # Clean user_query by removing price mentions
+        import re
+        query = re.sub(
+            r'between\s*₹[\d,]+\s*and\s*₹[\d,]+', '', user_query
+        )
+        query = re.sub(r'under\s*₹[\d,]+', '', query)
+        query = re.sub(r'₹[\d,]+', '', query)
+        query = query.strip()
+
     print(f"   → Query: {query}")
     print(f"   → Platforms: {platforms}")
+    print(f"   → Budget: ₹{budget_min} — ₹{budget_max}")
 
+    # ✅ Parallel search across all platforms
     tasks = []
 
     if "amazon" in platforms:
         tasks.append(
-            asyncio.to_thread(search_amazon, query, budget_max)
+            asyncio.to_thread(
+                search_amazon,
+                query,
+                budget_min if budget_min > 0 else None,
+                budget_max if budget_max > 0 else None
+            )
         )
     if "flipkart" in platforms:
         tasks.append(
-            asyncio.to_thread(search_flipkart, query, budget_max)
+            asyncio.to_thread(
+                search_flipkart,
+                query,
+                budget_max if budget_max > 0 else None
+            )
         )
     if "myntra" in platforms:
         tasks.append(
-            asyncio.to_thread(search_myntra, query, budget_max)
+            asyncio.to_thread(
+                search_myntra,
+                query,
+                budget_max if budget_max > 0 else None
+            )
         )
 
     # Run all searches in parallel
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    # Combine all results
+    # Combine results
     all_products = []
     for result in results:
         if isinstance(result, list):
@@ -147,7 +175,7 @@ async def rank_products(payload: dict) -> dict:
         score = 0
         title_lower = p.get("title", "").lower()
 
-        # Brand match = highest priority
+        # Brand match — highest priority
         if preferences.get("brand") and \
            preferences["brand"].lower() in title_lower:
             score += 5
@@ -169,19 +197,26 @@ async def rank_products(payload: dict) -> dict:
 
         # Rating bonus
         try:
-            rating = float(str(p.get("rating", "0")).replace("N/A", "0"))
+            rating = float(
+                str(p.get("rating", "0")).replace("N/A", "0")
+            )
             if rating >= 4.0:
                 score += 2
             elif rating >= 3.5:
                 score += 1
-        except:
+        except Exception:
             pass
 
-        # Budget bonus (cheaper = better within budget)
         price_num = p.get("price_num")
-        budget_max = preferences.get("budget_max")
-        if price_num and budget_max:
-            if price_num <= budget_max * 0.7:
+        budget_min = preferences.get("budget_min", 0) or 0
+        budget_max = preferences.get("budget_max", 0) or 0
+
+        if price_num and budget_max > 0:
+            # Within range gets bonus
+            if budget_min <= price_num <= budget_max:
+                score += 2
+            # Cheap within max is good
+            elif price_num <= budget_max * 0.7:
                 score += 1
 
         p["score"] = score
@@ -201,7 +236,6 @@ async def reflect_results(payload: dict) -> dict:
     """
     Self-reflection loop:
     Evaluates if results are good enough.
-    If not, suggests refined query.
     """
     products = payload.get("products", [])
     preferences = payload.get("preferences", {})
@@ -218,19 +252,22 @@ async def reflect_results(payload: dict) -> dict:
     if len(products) < 3 and attempts < max_attempts:
         issues.append("Too few results")
 
+    # Check brand match
     if products and preferences.get("brand"):
         brand_matches = [
             p for p in products
             if preferences["brand"].lower() in p.get("title", "").lower()
         ]
         if not brand_matches:
-            issues.append(f"No {preferences['brand']} products found")
+            issues.append(
+                f"No {preferences['brand']} products found"
+            )
 
     passed = len(issues) == 0 or attempts >= max_attempts
 
+    # Build refined query if needed
     refined_query = None
     if not passed and issues:
-        # Broaden search by removing brand constraint
         query_parts = []
         if preferences.get("color"):
             query_parts.append(preferences["color"])
@@ -247,7 +284,9 @@ async def reflect_results(payload: dict) -> dict:
         "issues": issues,
         "refined_query": refined_query,
         "attempts": attempts + 1,
-        "reason": ", ".join(issues) if issues else "Quality check passed"
+        "reason": (
+            ", ".join(issues) if issues else "Quality check passed"
+        )
     }
 
 

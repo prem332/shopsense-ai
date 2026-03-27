@@ -13,6 +13,9 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = "default"
     query: str
     platforms: Optional[list] = ["amazon", "flipkart", "myntra"]
+    budget_min: Optional[float] = 0
+    budget_max: Optional[float] = 0
+    gender: Optional[str] = ""
     stream: Optional[bool] = False
 
 
@@ -20,10 +23,22 @@ class ChatRequest(BaseModel):
 async def chat(request: ChatRequest):
     print(f"\n💬  Chat: {request.query}")
     try:
+        # ✅ ONLY add gender to query
+        # NEVER add budget — it breaks Guardrails!
+        enriched_query = request.query
+        if (
+            request.gender and
+            request.gender.lower() not in request.query.lower()
+        ):
+            enriched_query = f"{request.gender}'s {enriched_query}"
+
+        print(f"   → Query: {enriched_query}")
+        print(f"   → Budget: ₹{request.budget_min} — ₹{request.budget_max}")
+
         initial_state = {
             "user_id": request.user_id,
             "session_id": request.session_id,
-            "user_query": request.query,
+            "user_query": enriched_query,
             "intent": None,
             "is_valid": None,
             "conversation_history": [],
@@ -32,7 +47,8 @@ async def chat(request: ChatRequest):
             "size": None,
             "skin_tone": None,
             "occasion": None,
-            "budget_max": None,
+            "budget_min": request.budget_min,
+            "budget_max": request.budget_max,
             "brand": None,
             "platforms": request.platforms,
             "raw_products": None,
@@ -48,7 +64,6 @@ async def chat(request: ChatRequest):
             "error": None
         }
 
-        # Streaming response
         if request.stream:
             async def stream_response():
                 yield json.dumps({
@@ -78,7 +93,6 @@ async def chat(request: ChatRequest):
             )
 
         result = await shopping_graph.ainvoke(initial_state)
-
         products = result.get("ranked_products") or []
 
         return {

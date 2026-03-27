@@ -1,12 +1,78 @@
 import os
 from serpapi import GoogleSearch
-from app.backend.tools.serpapi_client import build_product, filter_by_budget
+from app.backend.tools.serpapi_client import build_product
 from dotenv import load_dotenv
 
 load_dotenv()
 
 
-def search_myntra(query: str, budget_max: float = None) -> list:
+def smart_select(
+    products: list,
+    budget_min: float = None,
+    budget_max: float = None,
+    count: int = 5
+) -> list:
+    """Spread selection across full price range"""
+    if len(products) <= count:
+        return products
+
+    priced = [p for p in products if p.get("price_num")]
+
+    if not priced:
+        return products[:count]
+
+    priced.sort(key=lambda x: x["price_num"])
+
+    min_price = priced[0]["price_num"]
+    max_price = priced[-1]["price_num"]
+    price_range = max_price - min_price
+
+    print(f"   → Price range in results: ₹{min_price} — ₹{max_price}")
+
+    if price_range < 500:
+        return priced[:count]
+
+    selected = []
+    band_size = price_range / count
+
+    for i in range(count):
+        band_min = min_price + (i * band_size)
+        band_max = min_price + ((i + 1) * band_size)
+
+        band_products = [
+            p for p in priced
+            if band_min <= p["price_num"] <= band_max
+            and p not in selected
+        ]
+
+        if band_products:
+            band_products.sort(
+                key=lambda x: float(
+                    str(x.get("rating", "0")).replace("N/A", "0")
+                ),
+                reverse=True
+            )
+            selected.append(band_products[0])
+
+    if len(selected) < count:
+        for p in priced:
+            if p not in selected:
+                selected.append(p)
+            if len(selected) >= count:
+                break
+
+    print(
+        f"   → Smart selected prices: "
+        f"{[p['price_num'] for p in selected]}"
+    )
+    return selected
+
+
+def search_myntra(
+    query: str,
+    budget_min: float = None,
+    budget_max: float = None
+) -> list:
     print(f"🛒 Myntra: searching '{query}'")
 
     params = {
@@ -17,22 +83,52 @@ def search_myntra(query: str, budget_max: float = None) -> list:
         "api_key": os.getenv("SERPAPI_KEY")
     }
 
+    # ✅ Pass price range to Google Shopping
+    if budget_min and budget_min > 0:
+        params["price_tmin"] = int(budget_min)
+        print(f"   → Myntra min_price filter: ₹{int(budget_min)}")
+
+    if budget_max and budget_max > 0:
+        params["price_tmax"] = int(budget_max)
+        print(f"   → Myntra max_price filter: ₹{int(budget_max)}")
+
     try:
         search = GoogleSearch(params)
         results = search.get_dict()
         items = results.get("shopping_results", [])
+        print(f"   → Raw results from Myntra: {len(items)}")
 
-        products = []
-        for item in items[:8]:
+        all_products = []
+        for item in items:
             p = build_product(item, "Myntra")
-            if p["title"] != "N/A":
-                products.append(p)
+            if p["title"] == "N/A":
+                continue
 
-        if budget_max:
-            products = filter_by_budget(products, budget_max)
+            price_num = p.get("price_num")
 
-        print(f"   → Found {len(products)} on Myntra")
-        return products[:5]
+            # Extra safety filter
+            if price_num is not None:
+                if budget_min and budget_min > 0:
+                    if price_num < budget_min:
+                        continue
+                if budget_max and budget_max > 0:
+                    if price_num > budget_max:
+                        continue
+
+            all_products.append(p)
+
+        print(f"   → Products in budget range: {len(all_products)}")
+
+        if not all_products:
+            print(f"   → Found 0 on Myntra after budget filter")
+            return []
+
+        final_products = smart_select(
+            all_products, budget_min, budget_max
+        )
+
+        print(f"   → Found {len(final_products)} on Myntra")
+        return final_products
 
     except Exception as e:
         print(f"   → Myntra error: {e}")

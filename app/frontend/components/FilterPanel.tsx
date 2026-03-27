@@ -8,9 +8,11 @@ export interface Filters {
   color: string;
   size: string;
   occasion: string;
-  budget: number;
+  budget_min: number;
+  budget_max: number;
   brand: string;
   platforms: string[];
+  gender: string;
 }
 
 interface FilterPanelProps {
@@ -19,8 +21,13 @@ interface FilterPanelProps {
   onReset: () => void;
 }
 
-const CATEGORIES = ["", "shirts", "pants", "shoes", "watches", "accessories", "kurta", "dress"];
-const OCCASIONS = ["", "formal", "casual", "wedding", "party", "sports"];
+const CATEGORIES = [
+  "", "shirts", "pants", "shoes", "watches",
+  "accessories", "kurta", "dress", "jeans", "jacket"
+];
+const OCCASIONS = [
+  "", "formal", "casual", "wedding", "party", "sports"
+];
 const PLATFORMS = ["amazon", "flipkart", "myntra"];
 
 export default function FilterPanel({
@@ -32,6 +39,18 @@ export default function FilterPanel({
 
   const update = (key: keyof Filters, value: any) => {
     onFiltersChange({ ...filters, [key]: value });
+  };
+
+  const handleMinBudget = (value: number) => {
+    if (value < filters.budget_max - 100) {
+      update("budget_min", value);
+    }
+  };
+
+  const handleMaxBudget = (value: number) => {
+    if (value > filters.budget_min + 100) {
+      update("budget_max", value);
+    }
   };
 
   const togglePlatform = (platform: string) => {
@@ -55,7 +74,10 @@ export default function FilterPanel({
           <h2 className="font-semibold text-gray-800">Filters</h2>
         </div>
         <button
-          onClick={(e) => { e.stopPropagation(); onReset(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onReset();
+          }}
           className="text-xs text-gray-500 hover:text-red-500 flex items-center gap-1"
         >
           <X size={12} />
@@ -65,6 +87,30 @@ export default function FilterPanel({
 
       {isOpen && (
         <div className="px-4 pb-4 space-y-4 border-t border-gray-100 pt-4">
+
+          {/* Gender */}
+          <div>
+            <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+              Gender
+            </label>
+            <div className="mt-2 flex gap-2">
+              {["male", "female"].map((g) => (
+                <button
+                  key={g}
+                  onClick={() =>
+                    update("gender", filters.gender === g ? "" : g)
+                  }
+                  className={`flex-1 text-sm py-2 rounded-lg border font-medium transition-colors capitalize ${
+                    filters.gender === g
+                      ? "bg-indigo-600 text-white border-indigo-600"
+                      : "bg-white text-gray-600 border-gray-300 hover:border-indigo-400"
+                  }`}
+                >
+                  {g === "male" ? "👨 Male" : "👩 Female"}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Category */}
           <div>
@@ -130,22 +176,57 @@ export default function FilterPanel({
             </select>
           </div>
 
-          {/* Budget */}
+          {/* Budget Range */}
           <div>
             <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
-              Max Budget: ₹{filters.budget.toLocaleString()}
+              Budget Range
             </label>
-            <input
-              type="range"
-              min={200}
-              max={10000}
-              step={100}
-              value={filters.budget}
-              onChange={(e) => update("budget", Number(e.target.value))}
-              className="mt-2 w-full accent-indigo-600"
-            />
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-sm font-semibold text-indigo-600">
+                ₹{filters.budget_min.toLocaleString()}
+              </span>
+              <span className="text-xs text-gray-400">to</span>
+              <span className="text-sm font-semibold text-indigo-600">
+                ₹{filters.budget_max.toLocaleString()}
+              </span>
+            </div>
+
+            {/* Min Slider */}
+            <div className="mt-2">
+              <div className="flex justify-between text-xs text-gray-500 mb-1">
+                <span>Min Price</span>
+                <span>₹{filters.budget_min.toLocaleString()}</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={10000}
+                step={100}
+                value={filters.budget_min}
+                onChange={(e) => handleMinBudget(Number(e.target.value))}
+                className="w-full accent-indigo-400"
+              />
+            </div>
+
+            {/* Max Slider */}
+            <div className="mt-2">
+              <div className="flex justify-between text-xs text-gray-500 mb-1">
+                <span>Max Price</span>
+                <span>₹{filters.budget_max.toLocaleString()}</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={10000}
+                step={100}
+                value={filters.budget_max}
+                onChange={(e) => handleMaxBudget(Number(e.target.value))}
+                className="w-full accent-indigo-600"
+              />
+            </div>
+
             <div className="flex justify-between text-xs text-gray-400 mt-1">
-              <span>₹200</span>
+              <span>₹0</span>
               <span>₹10,000</span>
             </div>
           </div>
@@ -185,6 +266,7 @@ export default function FilterPanel({
               ))}
             </div>
           </div>
+
         </div>
       )}
     </div>

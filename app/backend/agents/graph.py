@@ -11,13 +11,77 @@ def guardrails_node(state: ShopSenseState) -> ShopSenseState:
     query = state.get("user_query", "").lower()
 
     shopping_keywords = [
-        "shirt", "pants", "shoes", "watch", "dress",
-        "buy", "price", "brand", "size", "color",
-        "formal", "casual", "budget", "under", "alert",
-        "notify", "discount", "offer", "accessories"
+        # Clothing items
+        "shirt", "shirts", "pants", "pant", "shoes", "shoe",
+        "watch", "watches", "dress", "dresses",
+        "kurta", "kurtas", "kurti", "kurtis",
+        "saree", "sarees", "jacket", "jackets",
+        "jeans", "top", "tops", "skirt", "suit", "suits",
+        "blazer", "blazers", "sandal", "sandals",
+        "slipper", "slippers", "sneaker", "sneakers",
+        "heel", "heels", "bag", "bags", "purse",
+        "wallet", "belt", "belts", "legging", "leggings",
+        "dupatta", "salwar", "churidar", "trouser", "trousers",
+        "tshirt", "t-shirt", "polo", "sweatshirt", "hoodie",
+        "cap", "hat", "scarf", "sweater", "cardigan",
+        "shorts", "trackpant", "tracksuit",
+
+        # Gender keywords
+        "female", "male", "women", "men", "woman", "man",
+        "girl", "girls", "boy", "boys", "ladies", "gents",
+        "unisex", "her", "his",
+
+        # Gender possessives
+        "female's", "male's", "women's", "men's",
+        "girl's", "boy's", "ladies'",
+
+        # Actions
+        "suggest", "recommend", "find", "show", "need",
+        "want", "looking", "search", "get", "buy",
+        "purchase", "help me", "give me", "i need",
+        "i want",
+
+        # Attributes
+        "price", "brand", "size", "color", "colour",
+        "formal", "casual", "budget", "under", "between",
+        "cheap", "discount", "offer", "sale", "affordable",
+        "premium", "luxury", "quality",
+
+        # Occasions
+        "wedding", "party", "office", "sports", "gym",
+        "ethnic", "western", "traditional", "festive",
+        "anniversary", "birthday", "function",
+
+        # Alerts
+        "alert", "notify", "notification", "drop",
+        "stock", "available", "arrival", "inform",
+        "let me know", "tell me when", "remind",
+
+        # Materials
+        "cotton", "silk", "linen", "polyester", "wool",
+        "leather", "denim", "chiffon", "georgette",
+
+        # Colors
+        "navy", "lavender", "black", "white", "red",
+        "blue", "green", "yellow", "pink", "grey",
+        "beige", "maroon", "orange", "purple",
+
+        # General shopping
+        "collection", "wear", "outfit", "clothing",
+        "fashion", "accessories", "latest", "new",
+        "trending", "bestseller", "popular",
+        "comfortable", "stylish", "elegant"
     ]
 
     is_valid = any(word in query for word in shopping_keywords)
+
+
+    gender_prefixes = [
+        "female's", "male's", "women's", "men's",
+        "girl's", "boy's", "ladies'"
+    ]
+    if any(prefix in query for prefix in gender_prefixes):
+        is_valid = True
 
     if not is_valid:
         print("   → ❌ Invalid — not shopping related")
@@ -41,7 +105,8 @@ def intent_classifier_node(state: ShopSenseState) -> ShopSenseState:
         "when price", "drops to", "below",
         "inform me", "let me know", "tell me when",
         "set alert", "price alert", "stock alert",
-        "remind me", "watch price"
+        "remind me", "watch price", "price drop",
+        "back in stock", "when available", "new arrival"
     ]
 
     intent = "alert" if any(
@@ -51,9 +116,11 @@ def intent_classifier_node(state: ShopSenseState) -> ShopSenseState:
     print(f"   → Intent detected: {intent}")
     return {**state, "intent": intent}
 
+
 async def supervisor_node(state: ShopSenseState) -> ShopSenseState:
     from app.backend.agents.supervisor.supervisor_agent import run_supervisor
     return await run_supervisor(state)
+
 
 def route_by_validity(state: ShopSenseState) -> str:
     if not state.get("is_valid", True):

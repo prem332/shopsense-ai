@@ -24,21 +24,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Routers ────────────────────────────────────────────────────
 app.include_router(chat.router, prefix="/api", tags=["Chat"])
 app.include_router(search.router, prefix="/api", tags=["Search"])
 app.include_router(alerts.router, prefix="/api", tags=["Alerts"])
 
+# ── A2A Endpoints ──────────────────────────────────────────────
 @app.get("/.well-known/agent.json", tags=["A2A"])
 async def get_supervisor_card():
     card_path = "app/backend/a2a/agent_cards/supervisor_card.json"
     with open(card_path) as f:
         return json.load(f)
 
-
 @app.get("/a2a/agents", tags=["A2A"])
 async def list_agents():
     return registry.get_all_agents()
-
 
 @app.get("/a2a/agents/{agent_name}", tags=["A2A"])
 async def get_agent(agent_name: str):
@@ -47,18 +47,19 @@ async def get_agent(agent_name: str):
         return {"error": f"Agent '{agent_name}' not found"}
     return agent
 
-
+# ── Health ─────────────────────────────────────────────────────
 @app.get("/health", tags=["Health"])
 async def health():
     return {
         "status": "healthy",
         "service": "ShopSense AI",
         "version": "1.0.0",
-        "sprint": "Sprint 1 — Foundation",
+        "sprint": "Sprint 5 — Frontend",
         "agents": list(registry.agents.keys()),
         "langsmith": os.getenv("LANGCHAIN_TRACING_V2")
     }
 
+# ── Startup ────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup():
     print("\n" + "=" * 50)
