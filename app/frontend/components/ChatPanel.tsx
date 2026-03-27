@@ -267,7 +267,7 @@ export default function ChatPanel({
         <button
           onClick={handleFilterSearch}
           disabled={isLoading}
-          className="mt-2 w-full text-xs text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+          className="mt-2 w-full text-xs text-white bg-indigo-600 py-2 rounded-lg font-medium disabled:opacity-50"
         >
           🔍 Search with filters above
         </button>
