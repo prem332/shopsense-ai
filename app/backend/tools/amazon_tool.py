@@ -10,7 +10,7 @@ def smart_select(
     products: list,
     budget_min: float = None,
     budget_max: float = None,
-    count: int = 5
+    count: int = 10
 ) -> list:
     """Spread selection across full price range"""
     if len(products) <= count:
@@ -75,6 +75,9 @@ def search_amazon(
 ) -> list:
     print(f"🛒 Amazon: searching '{query}'")
 
+    # ✅ No min_price/max_price API params
+    # amazon.in does not support them reliably
+    # We do post-filtering instead
     params = {
         "engine": "amazon",
         "amazon_domain": "amazon.in",
@@ -82,25 +85,12 @@ def search_amazon(
         "api_key": os.getenv("SERPAPI_KEY")
     }
 
-    # ✅ Pass price range directly to Amazon!
-    # This tells Amazon to return products in this range
-    # Much better than filtering after the fact
-    if budget_min and budget_min > 0:
-        params["min_price"] = int(budget_min)
-        print(f"   → Amazon min_price filter: ₹{int(budget_min)}")
-
-    if budget_max and budget_max > 0:
-        params["max_price"] = int(budget_max)
-        print(f"   → Amazon max_price filter: ₹{int(budget_max)}")
-
     try:
         search = GoogleSearch(params)
         results = search.get_dict()
         items = results.get("organic_results", [])
         print(f"   → Raw results from Amazon: {len(items)}")
 
-        # Build products — no need to filter since
-        # Amazon already filtered by price
         all_products = []
         for item in items:
             p = build_product(item, "Amazon")
@@ -109,14 +99,20 @@ def search_amazon(
 
             price_num = p.get("price_num")
 
-            # Extra safety filter
-            if price_num is not None:
-                if budget_min and budget_min > 0:
-                    if price_num < budget_min:
-                        continue
-                if budget_max and budget_max > 0:
-                    if price_num > budget_max:
-                        continue
+            # Skip products with no price when budget is set
+            if price_num is None:
+                if not budget_min and not budget_max:
+                    all_products.append(p)
+                continue
+
+            # Post-filter by budget range
+            if budget_min and budget_min > 0:
+                if price_num < budget_min:
+                    continue
+
+            if budget_max and budget_max > 0:
+                if price_num > budget_max:
+                    continue
 
             all_products.append(p)
 
@@ -126,7 +122,6 @@ def search_amazon(
             print(f"   → Found 0 on Amazon after budget filter")
             return []
 
-        # Smart selection across price range
         final_products = smart_select(
             all_products, budget_min, budget_max
         )

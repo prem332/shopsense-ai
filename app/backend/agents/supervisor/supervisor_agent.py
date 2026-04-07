@@ -6,6 +6,22 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Explicit category keywords for locking category from query
+EXPLICIT_CATEGORIES = [
+    "kurta", "kurtas", "kurti", "kurtis",
+    "shirt", "shirts", "pants", "pant",
+    "shoes", "shoe", "watch", "watches",
+    "dress", "dresses", "saree", "sarees",
+    "jeans", "jacket", "jackets", "sandal",
+    "sandals", "bag", "bags", "belt", "belts",
+    "legging", "leggings", "top", "tops",
+    "blazer", "blazers", "suit", "suits",
+    "skirt", "hoodie", "sweatshirt", "cap",
+    "hat", "scarf", "wallet", "purse",
+    "slipper", "slippers", "sneaker", "sneakers",
+    "heel", "heels", "trouser", "trousers",
+]
+
 
 async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
     """
@@ -14,6 +30,7 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
     Sprint 3: Multi-platform + memory + reflection
     Sprint 4: Full alert registration with conditions
     Sprint 5: Gender + budget range support
+    Sprint 6: Category locking + budget post-filtering
     """
     print("\n🎯  Supervisor: Starting orchestration...")
 
@@ -27,6 +44,7 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
     # ══════════════════════════════════════════════════════════
     # STEP 1: Guardrails
     # ══════════════════════════════════════════════════════════
+
     print("📡  A2A → GuardrailsAgent: validate_input")
     guardrails_result = await supervisor_client.delegate_task(
         agent_name="GuardrailsAgent",
@@ -52,6 +70,7 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
     # ══════════════════════════════════════════════════════════
     # RECOMMENDATION FLOW
     # ══════════════════════════════════════════════════════════
+
     if intent == "recommendation":
 
         # Step 2: Extract preferences
@@ -67,13 +86,13 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
         )
         preferences = pref_result.get("preferences", {})
 
-        # ✅ Inject budget_min, budget_max, gender from state
+        # ✅ Inject budget_min and budget_max from state
         budget_min = state.get("budget_min") or 0
         budget_max = state.get("budget_max") or 0
         preferences["budget_min"] = budget_min
         preferences["budget_max"] = budget_max
 
-        # ✅ Inject gender
+        # ✅ Inject gender from state or detect from query
         gender = state.get("gender", "") or ""
         if not gender:
             query_lower = user_query.lower()
@@ -85,8 +104,16 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
                 "male", "men", "boy", "gents", "man"
             ]):
                 gender = "male"
-
         preferences["gender"] = gender
+
+        # ✅ Lock category from query — don't let LLM override it
+        # If query has explicit category word, use it directly
+        query_lower = user_query.lower()
+        for cat in EXPLICIT_CATEGORIES:
+            if cat in query_lower:
+                preferences["category"] = cat
+                print(f"   → Category locked from query: {cat}")
+                break
 
         print(
             f"   → Budget injected: ₹{budget_min} — ₹{budget_max}"
@@ -203,6 +230,7 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
     # ══════════════════════════════════════════════════════════
     # ALERT FLOW
     # ══════════════════════════════════════════════════════════
+
     elif intent == "alert":
         print("📡  A2A → AlertAgent: register_alert")
         alert_result = await supervisor_client.delegate_task(
@@ -267,5 +295,9 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
             "alert_id": alert_id,
             "final_response": response
         }
+
+    # ══════════════════════════════════════════════════════════
+    # FALLBACK
+    # ══════════════════════════════════════════════════════════
 
     return {**state, "final_response": "Request processed!"}

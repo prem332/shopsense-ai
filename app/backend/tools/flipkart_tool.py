@@ -10,7 +10,7 @@ def smart_select(
     products: list,
     budget_min: float = None,
     budget_max: float = None,
-    count: int = 5
+    count: int = 10
 ) -> list:
     """Spread selection across full price range"""
     if len(products) <= count:
@@ -83,15 +83,6 @@ def search_flipkart(
         "api_key": os.getenv("SERPAPI_KEY")
     }
 
-    # ✅ Pass price range to Google Shopping
-    if budget_min and budget_min > 0:
-        params["price_tmin"] = int(budget_min)
-        print(f"   → Flipkart min_price filter: ₹{int(budget_min)}")
-
-    if budget_max and budget_max > 0:
-        params["price_tmax"] = int(budget_max)
-        print(f"   → Flipkart max_price filter: ₹{int(budget_max)}")
-
     try:
         search = GoogleSearch(params)
         results = search.get_dict()
@@ -106,14 +97,20 @@ def search_flipkart(
 
             price_num = p.get("price_num")
 
-            # Extra safety filter
-            if price_num is not None:
-                if budget_min and budget_min > 0:
-                    if price_num < budget_min:
-                        continue
-                if budget_max and budget_max > 0:
-                    if price_num > budget_max:
-                        continue
+            # Skip products with no price when budget is set
+            if price_num is None:
+                if not budget_min and not budget_max:
+                    all_products.append(p)
+                continue
+
+            # Post-filter by budget range
+            if budget_min and budget_min > 0:
+                if price_num < budget_min:
+                    continue
+
+            if budget_max and budget_max > 0:
+                if price_num > budget_max:
+                    continue
 
             all_products.append(p)
 
