@@ -23,12 +23,12 @@ interface FilterPanelProps {
 
 const CATEGORIES = [
   "", "shirts", "pants", "shoes", "watches",
-  "accessories", "kurta", "dress", "jeans", "jacket"
+  "accessories", "kurta", "dress", "jeans",
+  "jacket", "saree", "bag", "belt"
 ];
 const OCCASIONS = [
   "", "formal", "casual", "wedding", "party", "sports"
 ];
-const PLATFORMS = ["amazon", "flipkart", "myntra"];
 
 export default function FilterPanel({
   filters,
@@ -51,14 +51,6 @@ export default function FilterPanel({
     if (value > filters.budget_min + 100) {
       update("budget_max", value);
     }
-  };
-
-  const togglePlatform = (platform: string) => {
-    const current = filters.platforms;
-    const updated = current.includes(platform)
-      ? current.filter((p) => p !== platform)
-      : [...current, platform];
-    update("platforms", updated);
   };
 
   return (
@@ -191,7 +183,6 @@ export default function FilterPanel({
               </span>
             </div>
 
-            {/* Min Slider */}
             <div className="mt-2">
               <div className="flex justify-between text-xs text-gray-500 mb-1">
                 <span>Min Price</span>
@@ -208,7 +199,6 @@ export default function FilterPanel({
               />
             </div>
 
-            {/* Max Slider */}
             <div className="mt-2">
               <div className="flex justify-between text-xs text-gray-500 mb-1">
                 <span>Max Price</span>
@@ -245,25 +235,18 @@ export default function FilterPanel({
             />
           </div>
 
-          {/* Platforms */}
+          {/* Platform */}
           <div>
             <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
-              Platforms
+              Platform
             </label>
-            <div className="mt-2 flex gap-2 flex-wrap">
-              {PLATFORMS.map((platform) => (
-                <button
-                  key={platform}
-                  onClick={() => togglePlatform(platform)}
-                  className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
-                    filters.platforms.includes(platform)
-                      ? "bg-indigo-600 text-white border-indigo-600"
-                      : "bg-white text-gray-600 border-gray-300 hover:border-indigo-400"
-                  }`}
-                >
-                  {platform.charAt(0).toUpperCase() + platform.slice(1)}
-                </button>
-              ))}
+            <div className="mt-2">
+              <span className="text-xs bg-orange-100 text-orange-700 px-3 py-1.5 rounded-full font-medium">
+                🛒 Amazon India
+              </span>
+              <p className="text-xs text-gray-400 mt-2">
+                Searching Amazon.in for best results
+              </p>
             </div>
           </div>
 

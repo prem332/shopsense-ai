@@ -84,13 +84,67 @@ def guardrails_node(state: ShopSenseState) -> ShopSenseState:
         is_valid = True
 
     if not is_valid:
-        print("   → ❌ Invalid — not shopping related")
+        import re
+
+        pii_patterns = {
+            "phone": r'\b[6-9]\d{9}\b',
+            "aadhaar": r'\b[2-9]{1}[0-9]{3}\s?[0-9]{4}\s?[0-9]{4}\b',
+            "pan": r'\b[A-Z]{5}[0-9]{4}[A-Z]{1}\b',
+            "email": r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+            "bank_account": r'\b\d{9,18}\b',
+            "credit_card": r'\b(?:\d{4}[-\s]?){3}\d{4}\b',
+        }
+
+        query = state.get("user_query", "")
+        pii_found = None
+        for pii_type, pattern in pii_patterns.items():
+            if re.search(pattern, query, re.IGNORECASE):
+                pii_found = pii_type
+                break
+
+        injection_patterns = [
+            "ignore previous", "ignore instructions",
+            "forget everything", "you are now",
+            "act as", "jailbreak", "system prompt",
+            "override", "bypass", "disable safety"
+        ]
+        is_injection = any(p in query.lower() for p in injection_patterns)
+
+        harmful_patterns = [
+            "weapon", "gun", "pistol", "bomb",
+            "cocaine", "heroin", "drug", "narcotic",
+            "fraud", "hack", "steal", "illegal"
+        ]
+        is_harmful = any(p in query.lower() for p in harmful_patterns)
+
+        if pii_found:
+            msg = (
+                f"⚠️ Your message contains personal information "
+                f"({pii_found}). Please don't share personal data "
+                f"like bank accounts, Aadhaar, PAN or phone numbers."
+            )
+        elif is_injection:
+            msg = (
+                "🚫 Prompt injection detected. "
+                "Please ask about shopping products only."
+            )
+        elif is_harmful:
+            msg = (
+                "❌ I can only help with legal shopping queries. "
+                "Please ask about clothing, accessories or other "
+                "legal products."
+            )
+        else:
+            msg = "❌ Please ask about shopping products only!"
+
+        print(f"   → ❌ Invalid — not shopping related")
         return {
             **state,
             "is_valid": False,
-            "rejection_reason": "Query is not shopping related",
-            "final_response": "❌ Please ask about shopping products only!"
+            "rejection_reason": msg,
+            "final_response": msg
         }
+
 
     print("   → ✅ Valid shopping query")
     return {**state, "is_valid": True}

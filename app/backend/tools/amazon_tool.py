@@ -77,7 +77,7 @@ def search_amazon(
 
     # ✅ No min_price/max_price API params
     # amazon.in does not support them reliably
-    # We do post-filtering instead
+    # Post-filtering is done after fetching results
     params = {
         "engine": "amazon",
         "amazon_domain": "amazon.in",
@@ -105,11 +105,12 @@ def search_amazon(
                     all_products.append(p)
                 continue
 
-            # Post-filter by budget range
+            # Post-filter by min price
             if budget_min and budget_min > 0:
                 if price_num < budget_min:
                     continue
 
+            # Post-filter by max price
             if budget_max and budget_max > 0:
                 if price_num > budget_max:
                     continue

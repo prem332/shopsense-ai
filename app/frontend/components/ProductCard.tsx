@@ -67,21 +67,6 @@ export default function ProductCard({ product, rank }: ProductCardProps) {
           )}
         </div>
 
-        {/* Score */}
-        {product.score > 0 && (
-          <div className="mb-3">
-            <div className="flex justify-between text-xs text-gray-500 mb-1">
-              <span>Match Score</span>
-              <span>{product.score}/10</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-1.5">
-              <div
-                className="bg-indigo-600 h-1.5 rounded-full"
-                style={{ width: `${Math.min(product.score * 10, 100)}%` }}
-              />
-            </div>
-          </div>
-        )}
 
         {/* Buy Button */}
         <a

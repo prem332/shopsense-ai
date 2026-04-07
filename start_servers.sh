@@ -27,7 +27,7 @@ echo "Starting AlertAgent (port 8004)..."
 uvicorn app.backend.a2a.servers.alert_server:app \
   --host 0.0.0.0 --port 8004 &
 
-# Wait longer for HuggingFace model to load
+# Wait for HuggingFace model to load
 echo "Waiting for agents to initialize (15 seconds)..."
 sleep 15
 

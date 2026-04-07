@@ -8,8 +8,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from app.backend.tools.amazon_tool import search_amazon
-from app.backend.tools.flipkart_tool import search_flipkart
-from app.backend.tools.myntra_tool import search_myntra
 from app.backend.vectorstore.pinecone_store import store_products
 
 load_dotenv()
@@ -24,6 +22,8 @@ app.add_middleware(
 )
 
 
+# ── Models ─────────────────────────────────────────────────────
+
 class A2ARequest(BaseModel):
     jsonrpc: str = "2.0"
     id: str
@@ -37,6 +37,8 @@ class A2AResponse(BaseModel):
     result: dict
 
 
+# ── Agent Card ─────────────────────────────────────────────────
+
 @app.get("/.well-known/agent.json")
 async def get_agent_card():
     card_path = Path(__file__).parent.parent / \
@@ -44,6 +46,8 @@ async def get_agent_card():
     with open(card_path) as f:
         return json.load(f)
 
+
+# ── A2A Endpoint ───────────────────────────────────────────────
 
 @app.post("/a2a")
 async def handle_task(request: A2ARequest) -> A2AResponse:
@@ -68,20 +72,20 @@ async def handle_task(request: A2ARequest) -> A2AResponse:
     )
 
 
+# ── Skill Implementations ──────────────────────────────────────
+
 async def search_products(payload: dict) -> dict:
     preferences = payload.get("preferences", {})
     user_query = payload.get("user_query", "")
-    platforms = payload.get("platforms", ["amazon", "flipkart", "myntra"])
 
-    # ✅ Extract all filter params
+
     budget_min = preferences.get("budget_min", 0) or 0
     budget_max = preferences.get("budget_max", 0) or 0
     gender = preferences.get("gender", "") or ""
 
-    # ✅ Build clean search query WITH gender
+    # ✅ Build clean search query with gender
     query_parts = []
 
-    # Add gender prefix to search
     if gender == "female":
         query_parts.append("women's")
     elif gender == "male":
@@ -102,46 +106,18 @@ async def search_products(payload: dict) -> dict:
 
     print(f"   → Query: {query}")
     print(f"   → Gender: {gender}")
-    print(f"   → Platforms: {platforms}")
+    print(f"   → Platform: Amazon only")
     print(f"   → Budget: ₹{budget_min} — ₹{budget_max}")
 
-    # ✅ Parallel search
-    tasks = []
+    # ✅ Search Amazon only
+    amazon_products = await asyncio.to_thread(
+        search_amazon,
+        query,
+        budget_min if budget_min > 0 else None,
+        budget_max if budget_max > 0 else None
+    )
 
-    if "amazon" in platforms:
-        tasks.append(
-            asyncio.to_thread(
-                search_amazon,
-                query,
-                budget_min if budget_min > 0 else None,
-                budget_max if budget_max > 0 else None
-            )
-        )
-    if "flipkart" in platforms:
-        tasks.append(
-            asyncio.to_thread(
-                search_flipkart,
-                query,
-                budget_min if budget_min > 0 else None,
-                budget_max if budget_max > 0 else None
-            )
-        )
-    if "myntra" in platforms:
-        tasks.append(
-            asyncio.to_thread(
-                search_myntra,
-                query,
-                budget_min if budget_min > 0 else None,
-                budget_max if budget_max > 0 else None
-            )
-        )
-
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    all_products = []
-    for result in results:
-        if isinstance(result, list):
-            all_products.extend(result)
+    all_products = amazon_products
 
     print(f"   → Total products found: {len(all_products)}")
 
@@ -223,7 +199,8 @@ async def rank_products(payload: dict) -> dict:
             elif price_num <= budget_max * 0.7:
                 score += 1
 
-        p["score"] = score
+        MAX_POSSIBLE = 19
+        p["score"] = round((score / MAX_POSSIBLE) * 10, 1)
         scored.append(p)
 
     ranked = sorted(scored, key=lambda x: x["score"], reverse=True)
@@ -293,11 +270,13 @@ async def reflect_results(payload: dict) -> dict:
     }
 
 
+# ── Health ─────────────────────────────────────────────────────
+
 @app.get("/health")
 async def health():
     return {
         "status": "healthy",
         "agent": "SearchRankAgent",
         "port": 8003,
-        "platforms": ["amazon", "flipkart", "myntra"]
+        "platforms": ["amazon"]
     }

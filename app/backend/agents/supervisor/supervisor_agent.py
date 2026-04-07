@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Explicit category keywords for locking category from query
 EXPLICIT_CATEGORIES = [
     "kurta", "kurtas", "kurti", "kurtis",
     "shirt", "shirts", "pants", "pant",
@@ -23,14 +22,24 @@ EXPLICIT_CATEGORIES = [
 ]
 
 
+BUDGET_KEYWORDS = [
+    "between", "under", "below", "budget",
+    "price", "rs", "rupee", "inr", "worth",
+    "range", "cost", "spend", "1000", "2000",
+    "3000", "4000", "5000", "6000", "7000",
+    "8000", "9000", "10000", "500", "1500",
+    "2500", "3500", "4500",
+]
+
+
 async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
     """
     Supervisor Agent — A2A CLIENT
     Sprint 2: Basic A2A orchestration
     Sprint 3: Multi-platform + memory + reflection
-    Sprint 4: Full alert registration with conditions
-    Sprint 5: Gender + budget range support
-    Sprint 6: Category locking + budget post-filtering
+    Sprint 4: Full alert registration
+    Sprint 5: Gender + budget range
+    Sprint 6: Smart budget detection + Amazon only
     """
     print("\n🎯  Supervisor: Starting orchestration...")
 
@@ -86,38 +95,69 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
         )
         preferences = pref_result.get("preferences", {})
 
-        # ✅ Inject budget_min and budget_max from state
+
+        query_lower = user_query.lower()
+        chat_has_budget = any(
+            word in query_lower for word in BUDGET_KEYWORDS
+        )
+
         budget_min = state.get("budget_min") or 0
         budget_max = state.get("budget_max") or 0
-        preferences["budget_min"] = budget_min
-        preferences["budget_max"] = budget_max
 
-        # ✅ Inject gender from state or detect from query
+        if chat_has_budget and preferences.get("budget_max"):
+            import re
+
+            # ✅ Try extract "between X and Y" pattern
+            between_match = re.search(
+                r'between\s+(\d+)\s+and\s+(\d+)', query_lower
+            )
+            if between_match:
+                preferences["budget_min"] = float(between_match.group(1))
+                preferences["budget_max"] = float(between_match.group(2))
+                print(
+                    f"   → Budget from CHAT (between): "
+                    f"₹{preferences['budget_min']} — "
+                    f"₹{preferences['budget_max']}"
+                )
+            else:
+                # No between pattern → use LLM extracted max only
+                preferences["budget_min"] = 0
+                preferences["budget_max"] = preferences.get("budget_max")
+                print(
+                    f"   → Budget from CHAT: "
+                    f"₹0 — ₹{preferences['budget_max']}"
+                )
+        else:
+            # No budget in chat → use filter panel values
+            preferences["budget_min"] = budget_min
+            preferences["budget_max"] = budget_max
+            print(
+                f"   → Budget from FILTERS: "
+                f"₹{budget_min} — ₹{budget_max}"
+            )
+
+        # ✅ Inject gender
         gender = state.get("gender", "") or ""
         if not gender:
-            query_lower = user_query.lower()
             if any(w in query_lower for w in [
-                "female", "women", "girl", "ladies", "woman"
+                "female", "women", "girl", "ladies",
+                "woman", "i am a female", "i'm a female"
             ]):
                 gender = "female"
             elif any(w in query_lower for w in [
-                "male", "men", "boy", "gents", "man"
+                "male", "men", "boy", "gents",
+                "man", "i am a male", "i'm a male"
             ]):
                 gender = "male"
         preferences["gender"] = gender
 
-        # ✅ Lock category from query — don't let LLM override it
-        # If query has explicit category word, use it directly
-        query_lower = user_query.lower()
+        # ✅ Lock category from query
         for cat in EXPLICIT_CATEGORIES:
             if cat in query_lower:
                 preferences["category"] = cat
-                print(f"   → Category locked from query: {cat}")
+                print(f"   → Category locked: {cat}")
                 break
 
-        print(
-            f"   → Budget injected: ₹{budget_min} — ₹{budget_max}"
-        )
         print(f"   → Gender injected: {gender}")
 
         # Step 3: Fetch preference history
@@ -131,11 +171,8 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
         if history:
             print(f"   → Found {len(history)} past preferences")
 
-        # Step 4: Search with self-reflection loop
-        platforms = state.get(
-            "platforms",
-            ["amazon", "flipkart", "myntra"]
-        )
+
+        platforms = ["amazon"]
         all_products = []
         reflection_attempts = 0
         max_attempts = 2
@@ -196,10 +233,7 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
         ranked = rank_result.get("ranked_products", [])
         print(f"✅  Supervisor: Got {len(ranked)} ranked products")
 
-        response = (
-            f"Found {len(ranked)} products "
-            f"across {len(platforms)} platforms!"
-        )
+        response = f"Found {len(ranked)} products on Amazon!"
 
         conversation_memory.add_turn(
             session_id=session_id,
@@ -263,11 +297,6 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
         if conditions.get("size"):
             condition_parts.append(f"Size: {conditions['size']}")
 
-        platforms = conditions.get("platforms", [])
-        platform_text = " + ".join(
-            [p.title() for p in platforms]
-        ) if platforms else "All platforms"
-
         conditions_text = (
             " | ".join(condition_parts)
             if condition_parts
@@ -277,7 +306,7 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
         response = (
             f"✅ Alert registered successfully!\n"
             f"🔔 Monitoring: {conditions_text}\n"
-            f"🏪 Platforms: {platform_text}\n"
+            f"🏪 Platform: Amazon\n"
             f"📋 Alert ID: {alert_id}\n"
             f"⏰ Checking every 6 hours"
         )
@@ -295,9 +324,5 @@ async def run_supervisor(state: ShopSenseState) -> ShopSenseState:
             "alert_id": alert_id,
             "final_response": response
         }
-
-    # ══════════════════════════════════════════════════════════
-    # FALLBACK
-    # ══════════════════════════════════════════════════════════
 
     return {**state, "final_response": "Request processed!"}
