@@ -1,35 +1,82 @@
-# Core
+# ── Core API ─────────────────────────────────────────────────
 fastapi==0.115.12
 uvicorn==0.34.2
 python-dotenv==1.1.0
 pydantic==2.11.4
+pydantic-settings==2.13.1
+python-multipart==0.0.20
+starlette==0.46.2
+sse-starlette==3.0.3
+httpx==0.28.1
 
+# ── LangChain + LangGraph ────────────────────────────────────
 langchain==0.3.25
-langchain-core==0.3.63
+langchain-core==0.3.83
 langchain-groq==0.2.4
 langchain-community==0.3.23
-langsmith==0.3.42
+langchain-huggingface==1.2.1
+langchain-text-splitters==0.3.8
+langsmith==0.3.45
 langgraph==0.4.1
+langgraph-checkpoint==2.1.2
+langgraph-prebuilt==0.5.1
+langgraph-sdk==0.3.12
 
-# A2A Protocol
+# ── LLM Providers ────────────────────────────────────────────
+groq==0.37.1
+
+# ── Embeddings + ML ──────────────────────────────────────────
+sentence-transformers==5.3.0
+transformers==5.3.0
+tokenizers==0.22.2
+torch==2.11.0
+huggingface_hub==1.8.0
+safetensors==0.7.0
+scikit-learn==1.8.0
+numpy==2.4.3
+
+# ── A2A Protocol ─────────────────────────────────────────────
 a2a-sdk==0.2.9
+grpcio==1.78.0
+grpcio-tools==1.71.2
 
-# Vector DBs
+# ── Vector Databases ─────────────────────────────────────────
 pinecone-client==5.0.1
+pinecone-plugin-inference==1.1.0
+pinecone-plugin-interface==0.0.7
 pgvector==0.3.6
 
-# Database
-sqlalchemy==2.0.40
+# ── Database ─────────────────────────────────────────────────
+SQLAlchemy==2.0.40
 psycopg2-binary==2.9.10
 supabase==2.15.1
+postgrest==1.0.2
+gotrue==2.12.4
+realtime==2.4.3
+storage3==0.11.3
 
-# Search
+# ── Search ───────────────────────────────────────────────────
 google-search-results==2.4.2
 serpapi==0.1.5
 
-# Demo UI
-streamlit
+# ── Evaluation ───────────────────────────────────────────────
+ragas==0.4.3
+datasets==4.8.4
+nest-asyncio==1.6.0
 
-# Utilities
-httpx==0.28.1
-python-multipart==0.0.20
+# ── Utilities ────────────────────────────────────────────────
+aiohttp==3.13.3
+anyio==4.13.0
+tenacity==9.1.4
+requests==2.33.0
+orjson==3.11.7
+packaging==24.2
+tqdm==4.67.3
+pandas==2.3.3
+pyarrow==23.0.1
+PyYAML==6.0.3
+typing_extensions==4.15.0
+certifi==2026.2.25
+
+# ── Demo (Streamlit UI in demo/ folder) ──────────────────────
+streamlit==1.55.0
