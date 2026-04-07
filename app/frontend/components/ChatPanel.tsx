@@ -18,6 +18,8 @@ interface ChatPanelProps {
   onProductsReceived: (response: ChatResponse) => void;
   sessionId: string;
   userId: string;
+  externalQuery?: string;
+  onExternalQueryHandled?: () => void;
 }
 
 export default function ChatPanel({
@@ -25,6 +27,8 @@ export default function ChatPanel({
   onProductsReceived,
   sessionId,
   userId,
+  externalQuery,
+  onExternalQueryHandled,
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -43,11 +47,20 @@ export default function ChatPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // ✅ Handle filter search from FilterPanel
+  useEffect(() => {
+    if (externalQuery && externalQuery.trim()) {
+      sendMessage(externalQuery);
+      if (onExternalQueryHandled) onExternalQueryHandled();
+    }
+  }, [externalQuery]);
+
   const buildAssistantMessage = (response: ChatResponse): string => {
     if (response.intent === "alert") {
       return response.response;
     }
 
+    // ✅ Show rejection message for invalid queries
     if (response.is_valid === false) {
       return response.response;
     }
@@ -66,6 +79,7 @@ export default function ChatPanel({
         `• Remove some filters`
       );
     }
+
     return `${response.response}\n\nScroll down to see the products! 🛍️`;
   };
 
@@ -130,45 +144,35 @@ export default function ChatPanel({
     }
   };
 
-  const handleFilterSearch = () => {
-    const parts: string[] = [];
-    if (filters.gender) parts.push(`${filters.gender}'s`);
-    if (filters.brand) parts.push(filters.brand);
-    if (filters.color) parts.push(filters.color);
-    if (filters.category) parts.push(filters.category);
-    if (filters.occasion) parts.push(`for ${filters.occasion}`);
-    if (filters.size) parts.push(`size ${filters.size}`);
-    const query = parts.join(" ") || "products";
-    sendMessage(query);
-  };
-
   return (
-    <div className="bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col h-[500px]">
+    // ✅ White body, navy header
+    <div className="bg-white border border-blue-100 rounded-xl shadow-sm flex flex-col h-[500px] overflow-hidden">
 
-      {/* Header */}
-      <div className="flex items-center gap-3 p-4 border-b border-gray-100">
-        <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
+      {/* ✅ Navy blue header strip */}
+      <div className="flex items-center gap-3 px-4 py-3 bg-blue-900">
+        <div className="w-8 h-8 bg-blue-700 rounded-full flex items-center justify-center">
           <Bot size={16} className="text-white" />
         </div>
         <div>
-          <h2 className="font-semibold text-gray-800">ShopSense AI</h2>
-          <p className="text-xs text-green-500">● Online</p>
+          <h2 className="font-semibold text-white">ShopSense AI</h2>
+          <p className="text-xs text-green-400">● Online</p>
         </div>
 
+        {/* Active filters indicator */}
         {(filters.budget_min > 0 || filters.gender || filters.category) && (
           <div className="ml-auto flex flex-wrap gap-1">
             {filters.gender && (
-              <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full capitalize">
+              <span className="text-xs bg-blue-700 text-blue-200 px-2 py-0.5 rounded-full capitalize">
                 {filters.gender}
               </span>
             )}
             {filters.category && (
-              <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full capitalize">
+              <span className="text-xs bg-blue-700 text-blue-200 px-2 py-0.5 rounded-full capitalize">
                 {filters.category}
               </span>
             )}
             {filters.budget_min > 0 && (
-              <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">
+              <span className="text-xs bg-green-800 text-green-300 px-2 py-0.5 rounded-full">
                 ₹{filters.budget_min.toLocaleString()}–
                 ₹{filters.budget_max.toLocaleString()}
               </span>
@@ -177,8 +181,8 @@ export default function ChatPanel({
         )}
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* ✅ White messages area */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
         {messages.map((message) => (
           <div
             key={message.id}
@@ -189,22 +193,22 @@ export default function ChatPanel({
             <div
               className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
                 message.role === "user"
-                  ? "bg-indigo-100"
-                  : "bg-indigo-600"
+                  ? "bg-blue-900"
+                  : "bg-blue-100"
               }`}
             >
               {message.role === "user" ? (
-                <User size={14} className="text-indigo-600" />
+                <User size={14} className="text-white" />
               ) : (
-                <Bot size={14} className="text-white" />
+                <Bot size={14} className="text-blue-700" />
               )}
             </div>
 
             <div
               className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm whitespace-pre-wrap ${
                 message.role === "user"
-                  ? "bg-indigo-600 text-white rounded-tr-none"
-                  : "bg-gray-100 text-gray-800 rounded-tl-none"
+                  ? "bg-blue-900 text-white rounded-tr-none"
+                  : "bg-blue-50 text-gray-800 rounded-tl-none"
               }`}
             >
               {message.content}
@@ -212,13 +216,14 @@ export default function ChatPanel({
           </div>
         ))}
 
+        {/* Loading indicator */}
         {isLoading && (
           <div className="flex gap-3">
-            <div className="w-7 h-7 bg-indigo-600 rounded-full flex items-center justify-center">
-              <Bot size={14} className="text-white" />
+            <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center">
+              <Bot size={14} className="text-blue-700" />
             </div>
-            <div className="bg-gray-100 px-4 py-3 rounded-2xl rounded-tl-none flex items-center gap-2">
-              <Loader2 size={14} className="animate-spin text-indigo-600" />
+            <div className="bg-blue-50 px-4 py-3 rounded-2xl rounded-tl-none flex items-center gap-2">
+              <Loader2 size={14} className="animate-spin text-blue-600" />
               <span className="text-xs text-gray-500">
                 Searching Amazon...
               </span>
@@ -229,8 +234,8 @@ export default function ChatPanel({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-4 border-t border-gray-100">
+      {/* ✅ White input area */}
+      <div className="p-4 border-t border-blue-100 bg-white">
         <div className="flex gap-2">
           <input
             type="text"
@@ -238,25 +243,17 @@ export default function ChatPanel({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && sendMessage()}
             placeholder="e.g. I am a male, blue shirt size M between 1500 and 6000..."
-            className="flex-1 text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="flex-1 text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
             disabled={isLoading}
           />
           <button
             onClick={() => sendMessage()}
             disabled={isLoading || !input.trim()}
-            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl transition-colors"
+            className="bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl transition-colors"
           >
             <Send size={16} />
           </button>
         </div>
-
-        <button
-          onClick={handleFilterSearch}
-          disabled={isLoading}
-          className="mt-2 w-full text-xs text-white bg-indigo-600 py-2 rounded-lg font-medium disabled:opacity-50"
-        >
-          🔍 Search with Filters
-        </button>
       </div>
     </div>
   );

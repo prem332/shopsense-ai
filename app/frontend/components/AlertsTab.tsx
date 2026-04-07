@@ -1,261 +1,283 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, Trash2, Pause, Play, Plus, Loader2, AlertCircle } from "lucide-react";
-import { getAlerts, createAlert, deleteAlert, pauseAlert } from "@/lib/api";
-import { Alert } from "@/types";
+import { Bell, Plus, Trash2, Pause, Play } from "lucide-react";
+
+interface Alert {
+  id: string;
+  user_id: string;
+  product_name: string;
+  conditions: {
+    brand?: string;
+    target_price?: number;
+    discount_pct?: number;
+    in_stock?: boolean;
+    color?: string;
+    size?: string;
+    platforms?: string[];
+  };
+  status: string;
+  created_at: string;
+}
 
 interface AlertsTabProps {
   userId: string;
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 export default function AlertsTab({ userId }: AlertsTabProps) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [newAlertQuery, setNewAlertQuery] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [alertQuery, setAlertQuery] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const fetchAlerts = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE}/api/alerts/${userId}`);
+      const data = await res.json();
+      if (data.status === "success") {
+        setAlerts(data.alerts || []);
+      }
+    } catch (err) {
+      setError("Failed to load alerts");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchAlerts();
   }, [userId]);
 
-  const fetchAlerts = async () => {
-    setIsLoading(true);
-    try {
-      const response = await getAlerts(userId);
-      setAlerts(response.alerts || []);
-    } catch (err) {
-      setError("Failed to load alerts");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleCreateAlert = async () => {
-    if (!newAlertQuery.trim()) return;
-    setIsCreating(true);
+    if (!alertQuery.trim()) return;
+    setSubmitting(true);
     try {
-      await createAlert(userId, newAlertQuery);
-      setNewAlertQuery("");
-      setShowForm(false);
-      await fetchAlerts();
+      const res = await fetch(`${API_BASE}/api/alerts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId, user_query: alertQuery }),
+      });
+      const data = await res.json();
+      if (data.status === "success") {
+        setAlertQuery("");
+        setShowForm(false);
+        fetchAlerts();
+      }
     } catch (err) {
       setError("Failed to create alert");
     } finally {
-      setIsCreating(false);
+      setSubmitting(false);
     }
   };
 
-  const handleDelete = async (alertId: string) => {
+  const handleDeleteAlert = async (alertId: string) => {
     try {
-      await deleteAlert(alertId);
-      setAlerts((prev) => prev.filter((a) => a.id !== alertId));
+      const res = await fetch(`${API_BASE}/api/alerts/${alertId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.status === "success") {
+        fetchAlerts();
+      }
     } catch (err) {
       setError("Failed to delete alert");
     }
   };
 
-  const handlePause = async (alertId: string) => {
+  const handleToggleAlert = async (alertId: string, currentStatus: string) => {
+    const newStatus = currentStatus === "active" ? "paused" : "active";
     try {
-      await pauseAlert(alertId);
-      await fetchAlerts();
+      const res = await fetch(`${API_BASE}/api/alerts/${alertId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const data = await res.json();
+      if (data.status === "success") {
+        fetchAlerts();
+      }
     } catch (err) {
-      setError("Failed to pause alert");
+      setError("Failed to update alert");
     }
   };
 
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+  const activeAlerts = alerts.filter((a) => a.status === "active");
 
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-100">
+  const EXAMPLE_QUERIES = [
+    "alert when price drops below ₹999",
+    "notify when 40% discount",
+    "alert when back in stock",
+  ];
+
+  return (
+    // ✅ White panel with navy accents
+    <div className="bg-white border border-blue-100 rounded-xl shadow-sm overflow-hidden">
+
+      {/* ✅ Navy blue header strip */}
+      <div className="flex items-center justify-between px-4 py-3 bg-blue-900">
         <div className="flex items-center gap-2">
-          <Bell size={18} className="text-indigo-600" />
-          <h2 className="font-semibold text-gray-800">Price Alerts</h2>
-          {alerts.length > 0 && (
-            <span className="bg-indigo-100 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">
-              {alerts.filter((a) => a.is_active).length} active
+          <Bell size={18} className="text-blue-300" />
+          <h3 className="font-semibold text-white">Price Alerts</h3>
+          {activeAlerts.length > 0 && (
+            <span className="text-xs bg-blue-700 text-blue-200 px-2 py-0.5 rounded-full">
+              {activeAlerts.length} active
             </span>
           )}
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded-lg transition-colors"
+          className="flex items-center gap-1.5 text-sm bg-white text-blue-900 px-3 py-1.5 rounded-lg font-medium hover:bg-blue-50 transition-colors"
         >
-          <Plus size={12} />
+          <Plus size={14} />
           New Alert
         </button>
       </div>
 
       {/* Create Alert Form */}
       {showForm && (
-        <div className="p-4 border-b border-gray-100 bg-indigo-50">
-          <p className="text-xs text-gray-600 mb-2">
+        <div className="p-4 border-b border-blue-100 bg-blue-50">
+          <p className="text-xs text-gray-500 mb-2">
             Describe what to monitor in plain English:
           </p>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newAlertQuery}
-              onChange={(e) => setNewAlertQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleCreateAlert()}
-              placeholder="alert when Allen Solly shirt drops below ₹999..."
-              className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-            />
-            <button
-              onClick={handleCreateAlert}
-              disabled={isCreating || !newAlertQuery.trim()}
-              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-            >
-              {isCreating
-                ? <Loader2 size={14} className="animate-spin" />
-                : "Set Alert"
-              }
-            </button>
-          </div>
-          <div className="mt-2 flex gap-2 flex-wrap">
-            {[
-              "alert when price drops below ₹999",
-              "notify when 40% discount",
-              "alert when back in stock",
-            ].map((example) => (
+          <input
+            type="text"
+            value={alertQuery}
+            onChange={(e) => setAlertQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreateAlert()}
+            placeholder="alert when Allen Solly shirt drops below ₹999..."
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3 bg-white text-gray-800"
+          />
+          <div className="flex flex-wrap gap-2 mb-3">
+            {EXAMPLE_QUERIES.map((q) => (
               <button
-                key={example}
-                onClick={() => setNewAlertQuery(example)}
-                className="text-xs bg-white border border-gray-200 px-2 py-1 rounded-full hover:border-indigo-400 transition-colors text-gray-600"
+                key={q}
+                onClick={() => setAlertQuery(q)}
+                className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full hover:bg-blue-200 transition-colors"
               >
-                {example}
+                {q}
               </button>
             ))}
           </div>
+          <button
+            onClick={handleCreateAlert}
+            disabled={submitting || !alertQuery.trim()}
+            className="w-full bg-blue-900 text-white font-medium text-sm py-2 rounded-lg hover:bg-blue-800 disabled:opacity-50 transition-colors"
+          >
+            {submitting ? "Setting Alert..." : "Set Alert"}
+          </button>
         </div>
       )}
 
       {/* Error */}
       {error && (
-        <div className="mx-4 mt-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
-          <AlertCircle size={14} className="text-red-500" />
-          <p className="text-sm text-red-600">{error}</p>
-          <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">×</button>
+        <div className="mx-4 mt-3 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-200">
+          {error}
         </div>
       )}
 
       {/* Alerts List */}
-      <div className="p-4">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 size={24} className="animate-spin text-indigo-600" />
+      <div className="p-4 space-y-3 bg-white">
+        {loading ? (
+          <div className="text-center py-8 text-gray-400">
+            Loading alerts...
           </div>
         ) : alerts.length === 0 ? (
-          <div className="text-center py-8">
-            <Bell size={40} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-gray-500 text-sm">No alerts yet</p>
+          <div className="text-center py-12">
+            <Bell size={40} className="mx-auto text-blue-200 mb-3" />
+            <p className="text-gray-500 font-medium">No alerts yet</p>
             <p className="text-gray-400 text-xs mt-1">
               Create an alert to monitor prices
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {alerts.map((alert) => (
-              <div
-                key={alert.id}
-                className={`border rounded-xl p-4 transition-all ${
-                  alert.is_active
-                    ? "border-gray-200 bg-white"
-                    : "border-gray-100 bg-gray-50 opacity-60"
-                }`}
-              >
-                {/* Alert Header */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                        alert.triggered_at
-                          ? "bg-green-500"
-                          : alert.is_active
-                          ? "bg-yellow-500 animate-pulse"
-                          : "bg-gray-400"
-                      }`} />
-                      <p className="text-sm font-medium text-gray-800">
-                        {alert.product_name || "Product Alert"}
-                      </p>
-                    </div>
+          alerts.map((alert) => (
+            <div
+              key={alert.id}
+              className={`bg-blue-50 rounded-xl p-4 border ${
+                alert.status === "active"
+                  ? "border-blue-200"
+                  : "border-gray-200 opacity-60"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 ${
+                      alert.status === "active"
+                        ? "bg-green-500"
+                        : "bg-gray-400"
+                    }`}
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-gray-800 capitalize">
+                      {alert.product_name || "Product Alert"}
+                    </p>
 
                     {/* Conditions */}
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {alert.brand && (
-                        <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
-                          {alert.brand}
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {alert.conditions?.brand && (
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                          {alert.conditions.brand}
                         </span>
                       )}
-                      {alert.target_price && (
-                        <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full">
-                          ≤ ₹{alert.target_price}
+                      {alert.conditions?.target_price && (
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                          ≤ ₹{alert.conditions.target_price}
                         </span>
                       )}
-                      {alert.discount_pct && (
-                        <span className="text-xs bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full">
-                          {alert.discount_pct}%+ off
+                      {alert.conditions?.discount_pct && (
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                          {alert.conditions.discount_pct}% off
                         </span>
                       )}
-                      {alert.in_stock && (
-                        <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">
-                          In stock
-                        </span>
-                      )}
-                      {alert.size && (
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                          Size {alert.size}
+                      {alert.conditions?.in_stock && (
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                          In Stock
                         </span>
                       )}
                     </div>
 
-                    {/* Platforms */}
-                    {alert.platform && (
-                      <p className="text-xs text-gray-400 mt-2">
-                        📍 {alert.platform.map((p) =>
-                          p.charAt(0).toUpperCase() + p.slice(1)
-                        ).join(" · ")}
+                    {/* Meta */}
+                    <div className="flex gap-3 mt-2">
+                      <p className="text-xs text-gray-400 flex items-center gap-1">
+                        📍 Amazon
                       </p>
-                    )}
-
-                    {/* Status */}
-                    <p className="text-xs text-gray-400 mt-1">
-                      {alert.triggered_at
-                        ? `✅ Triggered: ${new Date(alert.triggered_at).toLocaleDateString()}`
-                        : alert.is_active
-                        ? "⏰ Monitoring every 6 hours"
-                        : "⏸️ Paused"
-                      }
-                    </p>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-1 flex-shrink-0">
-                    <button
-                      onClick={() => handlePause(alert.id)}
-                      title={alert.is_active ? "Pause" : "Resume"}
-                      className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                    >
-                      {alert.is_active
-                        ? <Pause size={14} />
-                        : <Play size={14} />
-                      }
-                    </button>
-                    <button
-                      onClick={() => handleDelete(alert.id)}
-                      title="Delete"
-                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                      <p className="text-xs text-gray-400 flex items-center gap-1">
+                        🕐 Every 6 hours
+                      </p>
+                    </div>
                   </div>
                 </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => handleToggleAlert(alert.id, alert.status)}
+                    className="p-1.5 text-gray-400 hover:text-blue-700 hover:bg-blue-100 rounded-lg transition-colors"
+                    title={alert.status === "active" ? "Pause" : "Resume"}
+                  >
+                    {alert.status === "active" ? (
+                      <Pause size={14} />
+                    ) : (
+                      <Play size={14} />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleDeleteAlert(alert.id)}
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Delete"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))
         )}
       </div>
     </div>
