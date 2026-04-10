@@ -2,7 +2,7 @@ import os
 import uuid
 from datetime import datetime
 from sqlalchemy import create_engine, text
-from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
 import json
 from dotenv import load_dotenv
@@ -12,9 +12,9 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 
-llm = ChatGroq(
-    model="llama-3.1-8b-instant",
-    groq_api_key=os.getenv("GROQ_API_KEY"),
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    google_api_key=os.getenv("GEMINI_API_KEY"),
     temperature=0.1
 )
 

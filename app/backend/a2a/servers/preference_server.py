@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from pathlib import Path
-from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from dotenv import load_dotenv
@@ -25,9 +25,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-llm = ChatGroq(
-    model="llama-3.1-8b-instant",
-    groq_api_key=os.getenv("GROQ_API_KEY"),
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    google_api_key=os.getenv("GEMINI_API_KEY"),
     temperature=0.1
 )
 

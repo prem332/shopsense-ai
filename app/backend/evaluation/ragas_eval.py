@@ -18,22 +18,20 @@ from ragas.metrics import (
 from ragas.llms import LangchainLLMWrapper
 from ragas.embeddings import LangchainEmbeddingsWrapper
 
-from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
 
 # ── LLM + Embeddings Setup ─────────────────────────────────────
 
-# ✅ Wrap LLM for RAGAS 0.4.3
-groq_llm = ChatGroq(
-    model="llama-3.1-8b-instant",
-    groq_api_key=os.getenv("GROQ_API_KEY"),
+gemini_llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    google_api_key=os.getenv("GEMINI_API_KEY"),
     temperature=0,
     max_retries=2,
 )
-llm = LangchainLLMWrapper(groq_llm)
+llm = LangchainLLMWrapper(gemini_llm)
 
-# ✅ Wrap Embeddings for RAGAS 0.4.3
 hf_embeddings = HuggingFaceEmbeddings(
     model_name="all-MiniLM-L6-v2"
 )
@@ -144,7 +142,7 @@ async def run_evaluation():
     print("=" * 60)
     print(f"Evaluating {len(EVAL_DATASET)} test cases...")
     print(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-    print(f"Model: llama-3.1-8b-instant (Groq)")
+    print(f"Model: gemini-2.5-flash (Google)")
     print(f"Embeddings: all-MiniLM-L6-v2")
     print("=" * 60)
 
@@ -216,7 +214,7 @@ async def run_evaluation():
         "evaluation_date": datetime.now().strftime(
             "%Y-%m-%d %H:%M:%S"
         ),
-        "model": "llama-3.1-8b-instant (Groq)",
+        "model": "gemini-2.5-flash (Google)",
         "embeddings": "all-MiniLM-L6-v2 (HuggingFace)",
         "test_cases": len(EVAL_DATASET),
         "metrics": scores,
