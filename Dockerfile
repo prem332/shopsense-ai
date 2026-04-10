@@ -19,8 +19,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 COPY app/ ./app/
-COPY start_servers.sh .
-RUN chmod +x start_servers.sh
+COPY start_servers_prod.sh .
+RUN chmod +x start_servers_prod.sh
 
 EXPOSE 8000
 
