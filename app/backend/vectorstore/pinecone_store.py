@@ -1,7 +1,7 @@
 import os
 import hashlib
 from pinecone import Pinecone, ServerlessSpec
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from dotenv import load_dotenv
 
 load_dotenv()
