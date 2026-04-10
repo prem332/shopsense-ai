@@ -24,7 +24,8 @@ demo/.env
 app/.env
 app/backend/.env
 *.env
-!app/frontend/.env.production
+!*.env.production
+
 # IDE
 .vscode/
 .idea/
