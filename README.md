@@ -3,19 +3,22 @@
 
 [![CI](https://github.com/prem332/shopsense-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/prem332/shopsense-ai/actions/workflows/ci.yml)
 [![CD](https://github.com/prem332/shopsense-ai/actions/workflows/cd.yml/badge.svg)](https://github.com/prem332/shopsense-ai/actions/workflows/cd.yml)
-[![Python](https://img.shields.io/badge/Python-3.11-blue)](https://python.org)
-[![Next.js](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 ---
 
 ## 🔗 Live Demo
+
+> **⚠️ Important Note:** The live backend URL may respond with a cold start delay
+> or may be temporarily scaled down to zero instances to minimize GCP Cloud Run
+> billing costs. If the site does not load immediately, please wait 10-15 seconds
+> for the container to spin up, or refer to the demo video below.
 
 | Service | URL |
 |---------|-----|
 | **Frontend** | https://shopsense-ai-one.vercel.app |
 | **Backend API** | https://shopsense-ai-backend-ansjznbbxq-el.a.run.app |
 | **API Health** | https://shopsense-ai-backend-ansjznbbxq-el.a.run.app/health |
+| **Demo Video** | [Watch on Google Drive](https://drive.google.com/file/d/16zbpt3BUrgWf6cK13IMPMFGz0lQZFAyi/view?usp=drivesdk) |
 
 ---
 
@@ -152,6 +155,25 @@ Test Cases : 3 e-commerce queries
 
 ---
 
+## 📈 LangSmith Observability Metrics
+
+Monitored via LangSmith tracing across **282 traces** in production.
+
+| Metric | Value |
+|--------|-------|
+| **Error Rate** | 0% |
+| **P50 Latency** | 0.73 seconds |
+| **P99 Latency** | 44.68 seconds |
+| **Total Traces** | 282 |
+| **Project** | shopsense-ai |
+
+> **Note:** P99 latency of 44.68s includes cold start time of GCP Cloud Run
+> when the container scales from zero. Warm request P50 latency is 0.73s
+> which is well within acceptable limits for a multi-agent RAG pipeline
+> making parallel SerpAPI calls.
+
+---
+
 ## 🧪 Unit Tests
 
 ```
@@ -236,6 +258,28 @@ git push origin main
 |  - No manual steps needed             |
 +---------------------------------------+
 ```
+
+---
+
+## 📖 GCP Deployment Guide
+
+A complete step-by-step guide covering both **Manual Method** (GCP Console)
+and **Terminal Method** (Cloud Shell) for the full GCP deployment setup
+including service account creation, Artifact Registry, Cloud Run deployment,
+and CI/CD pipeline configuration.
+
+[📄 View GCP Setup Guide (PDF)](https://drive.google.com/file/d/188Kszmaa3erZantWoYuwvg_9j0ZUbN_q/view?usp=drivesdk)
+
+Covers:
+- Creating GCP project and enabling APIs
+- Service account setup with IAM roles
+- Artifact Registry Docker repository
+- GitHub Secrets configuration
+- Dockerfile and production start script
+- CI/CD pipeline setup
+- Cloud Run deployment with memory and CPU config
+- Vercel frontend deployment
+- End-to-end verification
 
 ---
 
@@ -403,5 +447,6 @@ Notify  : When condition is met
 **Prem Kumar Kale**
 - B.Tech, IIIT Sri City
 - AI/ML Engineer
+- Google Cloud Professional ML Engineer
 
 ---
